@@ -4,12 +4,12 @@
 using namespace hcm;
 
 
-template<u64 LOGP2, u64 LOGLB>
+template<u64 LOGLB=6, u64 LOGP2=17, u64 LOGP1=12>
 struct bimodal : predictor {
-  // P2 with 2^LOGP2 entries
+  // P1: bimodal with 2^LOGP1 entries
+  // P2: bimodal with 2^LOGP2 entries
   // provides 2^(LOGLB-2) predictions per cycle
   static_assert(LOGLB>2);
-  static constexpr u64 LOGP1 = 12;
   static constexpr u64 LOGLINEINST = LOGLB-2;
   static constexpr u64 LINEINST = 1<<LOGLINEINST;
   static_assert(LOGP1 > LOGLINEINST);
@@ -31,8 +31,8 @@ struct bimodal : predictor {
   arr<reg<1>,LINEINST> branch_dir;
   reg<LINEINST> block_entry; // one-hot vector
 
-  ram<val<2>,(1<<index1_bits)> table1[LINEINST]; // P1 (bimodal)
-  ram<val<2>,(1<<index2_bits)> table2[LINEINST]; // P2 (bimodal)
+  ram<val<2>,(1<<index1_bits)> table1[LINEINST]; // P1
+  ram<val<2>,(1<<index2_bits)> table2[LINEINST]; // P2
 
   void new_block(val<64> inst_pc)
   {

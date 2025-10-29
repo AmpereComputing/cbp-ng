@@ -1,8 +1,8 @@
 To compile the default predictor:
 ./compile cbp
 
-To change the predictor:
-./compile cbp -DPREDICTOR="gshare<17,12,6>"
+To compile a specific predictor:
+./compile cbp -DPREDICTOR="gshare<>"
 
 To simulate one trace:
 ./cbp cbp6_traces/compress/compress_0_trace.gz compress_0 0 10000000
@@ -39,3 +39,4 @@ or
 To simulate all traces:
 ./run_all reference cbp6_traces OUTDIR
 ====================================================================================
+

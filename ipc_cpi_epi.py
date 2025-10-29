@@ -30,7 +30,7 @@ for filename in os.listdir(directory):
         p1_latency = max(p1_latency,math.ceil(float(p1_lat)))
         p2_latency = max(p2_latency,math.ceil(float(p2_lat)))
 
-        
+
 # calculate average IPC, CPI, EPI
 count = 0
 avg_IPC = 0
@@ -48,9 +48,9 @@ for filename in os.listdir(directory):
         line = f.readline().strip()
         if not line:
             continue
-    
+
         name, instr, branch, condbr, npred, diverge, misp, p1_lat, p2_lat, epi = line.split(',')
-        
+
         instructions = float(instr)
         pred_cycles = float(npred)
         divergences = float(diverge)
@@ -58,7 +58,7 @@ for filename in os.listdir(directory):
 
         # dynamic energy per instrucion
         EPI = float(epi)
-        
+
         # mispredictions per instruction
         MPI = p2_mispredictions / instructions
 
@@ -73,14 +73,14 @@ for filename in os.listdir(directory):
         CPI = MPI * (misprediction_penalty + p2_latency)
 
         #print(f"{name},{IPC:.6f},{CPI:.6f},{EPI}")
-        
+
         count += 1
         avg_IPC += 1 / IPC # harmonic mean
         avg_CPI += CPI # arithmetic mean
         avg_EPI += EPI # arithmetic mean
-        
+
 avg_IPC = count / avg_IPC
 avg_CPI = avg_CPI / count
 avg_EPI = avg_EPI / count
 
-print(f"{avg_IPC:.4f},{avg_CPI:.4f},{avg_EPI:.0f}")
+print(f"{avg_IPC:.6f},{avg_CPI:.6f},{avg_EPI:.6f}")

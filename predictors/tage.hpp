@@ -7,11 +7,12 @@
 
 using namespace hcm;
 
-template<u64 NUMG, u64 LOGG, u64 LOGB, u64 TAGW, u64 GHIST, u64 LOGLB>
+template<u64 LOGLB=6, u64 NUMG=8, u64 LOGG=11, u64 LOGB=12, u64 TAGW=11, u64 GHIST=100, u64 LOGP1=14, u64 GHIST1=6>
 struct tage : predictor {
   // provides 2^(LOGLB-2) predictions per cycle
+  // P2 is a TAGE, P1 is a gshare
   static_assert(LOGLB>2);
-  static constexpr u64 LOGP1 = 12;
+  static_assert(NUMG>0);
   static constexpr u64 CTR = 3;
   static constexpr u64 MINHIST = 2;
   static constexpr u64 WEAK1 = 1<<(CTR-1);
@@ -33,10 +34,11 @@ struct tage : predictor {
 
   geometric_folds<NUMG,MINHIST,GHIST,LOGG,HTAGBITS> gfolds;
   reg<1> true_block = 1;
-  
+
   // for P1
+  reg<GHIST1> global_history1;
   reg<index1_bits> index1;
-  arr<reg<2>,LINEINST> readb1; // read P1 bimodal counters for each offset
+  arr<reg<2>,LINEINST> readb1; // read P1 counters for each offset
   reg<LINEINST> p1; // P1 predictions
 
   // for P2
@@ -109,15 +111,19 @@ struct tage : predictor {
   {
     inst_pc.fanout(hard<2>{});
     new_block(inst_pc);
-    index1 = inst_pc >> LOGLB;
+    val<std::max(index1_bits,GHIST1)> lineaddr = inst_pc >> LOGLB;
+    lineaddr.fanout(hard<2>{});
+    if constexpr (GHIST1 <= index1_bits) {
+      index1 = lineaddr ^ (val<index1_bits>{global_history1}<<(index1_bits-GHIST1));
+    } else {
+      index1 = global_history1.make_array(val<index1_bits>{}).append(lineaddr).fold_xor();
+    }
     index1.fanout(hard<LINEINST>{});
     for (u64 offset=0; offset<LINEINST; offset++) {
       readb1[offset] = table1[offset].read(index1);
     }
     readb1.fanout(hard<2>{});
-    p1 = arr<val<1>,LINEINST>{[&](u64 offset){
-      return readb1[offset] >> 1;
-    }}.concat();
+    p1 = arr<val<1>,LINEINST>{[&](u64 offset){return readb1[offset]>>1;}}.concat();
     p1.fanout(hard<LINEINST>{});
     return (block_entry & p1) != hard<0>{};
   };
@@ -129,18 +135,22 @@ struct tage : predictor {
 
   val<1> predict2(val<64> inst_pc)
   {
-    val<std::max(bindex2_bits,LOGG)> lineaddr = inst_pc.fo1() >> LOGLB;
+    val<std::max(bindex2_bits,LOGG)> lineaddr = inst_pc >> LOGLB;
     lineaddr.fanout(hard<1+NUMG*2>{});
     gfolds.fanout(hard<2>{});
 
-    // compute indexes and hashed tags
+    // compute indexes
     bindex2 = lineaddr;
     bindex2.fanout(hard<LINEINST>{});
     for (u64 i=0; i<NUMG; i++) {
       gindex[i] = lineaddr ^ gfolds.template get<0>(i);
+    }
+    gindex.fanout(hard<3>{});
+    
+    // compute hashed tags
+    for (u64 i=0; i<NUMG; i++) {
       htag[i] = val<HTAGBITS>{lineaddr}.reverse() ^ gfolds.template get<1>(i);
     }
-    gindex.fanout(hard<3>{});  
     htag.fanout(hard<2>{});
 
     // read tables
@@ -170,7 +180,7 @@ struct tage : predictor {
     arr<val<1>,NUMG> htagcmp_split = [&](int i){return val<HTAGBITS>{readt[i]} == htag[i];};
     val<NUMG> htagcmp = htagcmp_split.fo1().concat();
     htagcmp.fanout(hard<LINEINST>{});
-
+    
     // generate match mask for each offset
     static_loop<LINEINST>([&]<u64 offset>(){
       arr<val<1>,NUMG> tagcmp = [&](int i){return val<LOGLINEINST>{readt[i]>>HTAGBITS} == hard<offset>{};};
@@ -251,7 +261,9 @@ struct tage : predictor {
       execute_if(~true_block, [&](){
 	// previous block ended on a mispredicted not-taken branch
 	// we are still in the same line, this is the last chunk
-	gfolds.update(val<PATHBITS>{next_pc.fo1()>>2});
+	next_pc.fanout(hard<2>{});
+	global_history1 = (global_history1 << 1) ^ val<GHIST1>{next_pc>>2};
+	gfolds.update(val<PATHBITS>{next_pc>>2});
 	true_block = 1;
       });
       return; // stop here
@@ -428,7 +440,9 @@ struct tage : predictor {
     val<1> line_end = block_entry >> (LINEINST-block_size);
     true_block = correct_pred | branch_dir[num_branch-1] | line_end.fo1();
     execute_if(true_block, [&](){
-      gfolds.update(val<PATHBITS>{next_pc.fo1()>>2});
+      next_pc.fanout(hard<2>{});
+      global_history1 = (global_history1 << 1) ^ val<GHIST1>{next_pc>>2};
+      gfolds.update(val<PATHBITS>{next_pc>>2});
     });
     
     num_branch = 0; // done
