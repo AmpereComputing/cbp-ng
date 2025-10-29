@@ -3,9 +3,9 @@
 using namespace hcm;
 
 
-#define EXEC(...)				\
-  std::cout << #__VA_ARGS__ << std::endl;	\
-  __VA_ARGS__;
+#define EXEC(...)                               \
+    std::cout << #__VA_ARGS__ << std::endl;     \
+    __VA_ARGS__;
 
 
 class harcom_superuser {
@@ -32,7 +32,7 @@ void binary_operators(TX x, TY y)
   if constexpr (valtype<TX> && hardval<TY>)
     (x/y).print("x/y=","\n",false);
   if constexpr (valtype<TX> && hardval<TY>)
-    (x%y).print("x%y=","\n",false);  
+    (x%y).print("x%y=","\n",false);
   (x&y).printb("x&y=","\n",false);
   (x|y).printb("x|y=","\n",false);
   (x^y).printb("x^y=","\n\n",false);
@@ -176,7 +176,7 @@ int main()
     EXEC(val<4>{5}.distribute(M3).print());
     EXEC(M2.reset());
     hsu.next_cycle();
-    EXEC(M2.read(x*x).concat().printb("","\n\n",false));    
+    EXEC(M2.read(x*x).concat().printb("","\n\n",false));
   }
   {
     EXEC(val<8,i64> x=-100);

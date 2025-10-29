@@ -1,9 +1,0 @@
-* when panel.energy_fJ becomes very large, increment is not accurate
-
-* RAM can do 1 read + 1 write per cycle, not compatible with 6T single-port
-
-* SRAM cost function should take into account write latency (impacts energy)
-
-* SRAM should do column multiplexing before sensing
-
-* leakage depends on temperature
