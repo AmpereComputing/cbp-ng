@@ -121,7 +121,7 @@ namespace hcm {
 
   template<u64 N, arith T> class val;
   template<u64 N, arith T> class reg;
-  
+
   template<typename T>
   concept valtype = requires(const T &x) {[]<u64 N, arith U>(const val<N,U>&){}(x);};
 
@@ -135,7 +135,7 @@ namespace hcm {
 
   template<typename T>
   concept regtype = requires(const T &x) {[]<u64 N, arith U>(const reg<N,U>&){}(x);};
-  
+
   template<typename T>
   concept memdatatype = (valtype<T> || arrtype<T>) && ! regtype<T> && ! regtype<typename T::type>;
 
@@ -146,7 +146,7 @@ namespace hcm {
 
 
   // ######################################################
-  
+
   template<typename T>
   struct toval_impl {};
 
@@ -169,7 +169,7 @@ namespace hcm {
 
   template<arith T>
   struct base_impl<T> {using type = T;};
-  
+
   template<valtype T>
   struct base_impl<T> {using type = toval<T>::type;};
 
@@ -209,7 +209,7 @@ namespace hcm {
   template<ival T1, fval T2>
   struct valt_impl<T1,T2> {
     using type = toval<T2>;
-  };  
+  };
 
   template<fval T1, ival T2>
   struct valt_impl<T1,T2> {
@@ -226,7 +226,7 @@ namespace hcm {
 
   template<action A>
   struct action_return {};
-  
+
   template<action A> requires (std::invocable<A>)
   struct action_return<A> {
     using type = std::invoke_result_t<A>;
@@ -347,22 +347,22 @@ namespace hcm {
     i64 n = p;
     if (f64(n)==p) {
       if (n>=0) {
-	return ipow(x,n);
+        return ipow(x,n);
       } else {
-	return 1. / ipow(x,-n);
+        return 1. / ipow(x,-n);
       }
     }
     assert(x>0);
     return myexp(p*mylog(x));
   }
 
-  
+
   // ######################################################
   // integer comparison functions
 
   template <typename T>
   concept standard_integral = std::integral<T> && ! std::same_as<T,char> && ! std::same_as<T,char8_t> && ! std::same_as<T,char16_t> && ! std::same_as<T,char32_t> && ! std::same_as<T,wchar_t> && ! std::same_as<T,bool>;
-  
+
   template<typename T, typename U>
   bool is_equal(T x, U y)
   {
@@ -380,9 +380,9 @@ namespace hcm {
       return std::cmp_not_equal(x,y);
     } else {
       return x != y;
-    }   
+    }
   }
-  
+
   template<typename T, typename U>
   bool is_less(T x, U y)
   {
@@ -400,7 +400,7 @@ namespace hcm {
       return std::cmp_greater(x,y);
     } else {
       return x > y;
-    }    
+    }
   }
 
   template<typename T, typename U>
@@ -421,7 +421,7 @@ namespace hcm {
     } else {
       return x >= y;
     }
-  }  
+  }
 
 
   // ######################################################
@@ -440,9 +440,9 @@ namespace hcm {
     } else {
       static_assert(std::signed_integral<T>);
       if (x>=0) {
-	return std::bit_width(u64(x))+1;
+        return std::bit_width(u64(x))+1;
       } else {
-	return std::bit_width(u64(-x-1))+1;
+        return std::bit_width(u64(-x-1))+1;
       }
     }
   }
@@ -497,8 +497,8 @@ namespace hcm {
     } else {
       T y = reversed_byte[x & 0xFF];
       for (u64 i=1; i<sizeof(T); i++) {
-	x >>= 8;
-	y = (y<<8) | reversed_byte[x & 0xFF];
+        x >>= 8;
+        y = (y<<8) | reversed_byte[x & 0xFF];
       }
       return y;
     }
@@ -520,17 +520,17 @@ namespace hcm {
       std::array<u64,M> out{};
       u64 nbits = 0;
       for (u64 i=0; i<N; i++) {
-	u64 x = u64(in[i]) & mask;
-	u64 j = nbits / 64;
-	u64 pos = nbits % 64;
-	assert(j<M);
-	out[j] |= x << pos;
-	if (pos+W > 64) {
-	  assert(pos!=0);
-	  assert(j+1<M);
-	  out[j+1] = x >> (64-pos);
-	}
-	nbits += W;
+        u64 x = u64(in[i]) & mask;
+        u64 j = nbits / 64;
+        u64 pos = nbits % 64;
+        assert(j<M);
+        out[j] |= x << pos;
+        if (pos+W > 64) {
+          assert(pos!=0);
+          assert(j+1<M);
+          out[j+1] = x >> (64-pos);
+        }
+        nbits += W;
       }
       return out;
     }
@@ -551,17 +551,17 @@ namespace hcm {
       std::array<u64,M> out{};
       u64 nbits = 0;
       for (u64 j=0; j<M; j++) {
-	u64 i = nbits / 64;
-	u64 pos = nbits % 64;
-	assert(i<N);
-	if (pos+W <= 64) {
-	  out[j] = (in[i] >> pos) & mask;
-	} else {
-	  u64 right = in[i] >> pos;	
-	  u64 left = (i+1<N)? in[i+1] : 0;
-	  out[j] = (right | (left << (64-pos))) & mask;
-	}
-	nbits += W;
+        u64 i = nbits / 64;
+        u64 pos = nbits % 64;
+        assert(i<N);
+        if (pos+W <= 64) {
+          out[j] = (in[i] >> pos) & mask;
+        } else {
+          u64 right = in[i] >> pos;
+          u64 left = (i+1<N)? in[i+1] : 0;
+          out[j] = (right | (left << (64-pos))) & mask;
+        }
+        nbits += W;
       }
       return out;
     }
@@ -576,13 +576,13 @@ namespace hcm {
     const u64 halfb = b/2 + (b&1);
     for (u64 i=0; i<N; i++) {
       if (a >= halfb) {
-	// 2a >= b
-	frac.at(N-1-i) = 1;
-	a = 2*a-b;
+        // 2a >= b
+        frac.at(N-1-i) = 1;
+        a = 2*a-b;
       } else {
-	// 2a < b
-	frac.at(N-1-i) = 0;
-	a = 2*a;
+        // 2a < b
+        frac.at(N-1-i) = 0;
+        a = 2*a;
       }
       assert(a<b);
     }
@@ -614,13 +614,13 @@ namespace hcm {
       modm = (modm*2) % m;
     }
     return 0; // n does not exist
-  }  
+  }
 
 
   // ######################################################
   // utility for doing a static loop over an integer template argument (0,...,N-1)
   // the loop body is a C++ lambda with one integer template parameter
-  
+
   template<typename T>
   concept static_loop_body = requires (T obj) {obj.template operator()<0>();};
 
@@ -644,10 +644,10 @@ namespace hcm {
   // assume unique linear capacitance (fF/um) for all metal layers
   inline constexpr f64 METALCAP_fF = 0.2; // fF/um
   inline constexpr f64 METALRES[] = {150/*Mx*/,25/*My*/}; // Ohm/um
-  
+
   inline constexpr f64 PINV = 1; // ratio of drain capacitance to gate capacitance
 
-  // TSMC 5nm, Chang, IEEE JSSC, jan 2021: 
+  // TSMC 5nm, Chang, IEEE JSSC, jan 2021:
   // each transistor in 6T cell has single fin (for high density)
   // bitline capacitance per cell = 1 drain capacitance (Cd) + 1 Mx wire segment (Cw)
   // Flying bitline (Mx+2) reduces bitline capacitance: 50%(bottom)/65%(top)
@@ -685,7 +685,7 @@ namespace hcm {
       os << "  length (um): " << bitline_length << std::endl;
       os << "  wire resistance (Ohm): " << bitline_resistance << std::endl;
       os << "  wire capacitance (fF): " << bitline_wirecap << std::endl;
-      os << "  capacitance (fF): " << bitline_capacitance << std::endl;      
+      os << "  capacitance (fF): " << bitline_capacitance << std::endl;
     }
   } SRAM_CELL;
 
@@ -719,7 +719,7 @@ namespace hcm {
 
   constexpr f64 energy_fJ(f64 cap_fF, f64 vdiff/*volt*/)
   {
-    // energy dissipated for charging a capacitance by VDIFF>0, then discharging by -VDIFF 
+    // energy dissipated for charging a capacitance by VDIFF>0, then discharging by -VDIFF
     assert(vdiff>0);
     return cap_fF * vdiff * VDD; // fJ
   }
@@ -733,7 +733,7 @@ namespace hcm {
     // FIXME: this is a very rough model (e.g., ignores stacking and temperature)
     return ((sram_fins/2) * IOFF_SRAM + (logic_fins/2) * IOFF) * VDD * 1e3; // mW
   }
-  
+
 
   constexpr f64 wire_res_delay(f64 res/*Ohm*/, f64 wirecap_pF, f64 loadcap_pF=0)
   {
@@ -769,7 +769,7 @@ namespace hcm {
     u64 f = 0; // fins
 
     constexpr circuit() : t(0), d(0), ci(0), cg(0), e(0), w(0), f(0) {}
-    
+
     constexpr circuit(u64 t, f64 d, f64 ci, f64 cg, u64 f, f64 bias) : t(t), d(d), ci(ci), cg(cg), e(gate_energy_fJ(bias)), w(0), f(f)
     {
       assert(t!=0);
@@ -856,7 +856,7 @@ namespace hcm {
       para.w = w + x.w;
       return para;
     }
-    
+
     constexpr circuit operator| (const circuit &x) const
     {
       // parallel, single input
@@ -883,7 +883,7 @@ namespace hcm {
     u64 nci = 0; // number of input types
     f64 cimax = 0; // maximum input capacitance
     u64 fins = 0; // number of fins
-    
+
     constexpr void init_ci(cilist l)
     {
       nci = l.size();
@@ -1015,9 +1015,9 @@ namespace hcm {
     if (ninv!=0) {
       assert(beta>=1);
       for (u64 i=0; i<ninv; i++) {
-	scale *= beta;
-	f64 ci = inv{}.icap(scale) * beta;
-	buf = buf + inv{}.make((i==(ninv-1))? co:ci,scale,bias);
+        scale *= beta;
+        f64 ci = inv{}.icap(scale) * beta;
+        buf = buf + inv{}.make((i==(ninv-1))? co:ci,scale,bias);
       }
     }
     if (buf.nogate()) buf.ci = co;
@@ -1070,11 +1070,11 @@ namespace hcm {
     static_assert(B>=2);
     if (n<=B) {
       if (cpl) {
-	return inv{}.make(co*n);
+        return inv{}.make(co*n);
       } else {
-	circuit nogate;
-	nogate.ci = co*n;
-	return nogate;
+        circuit nogate;
+        nogate.ci = co*n;
+        return nogate;
       }
     }
     u64 m = n / B;
@@ -1120,12 +1120,12 @@ namespace hcm {
       u64 r = n%w;
       u64 nw = n/w;
       if (r!=0) {
-	r += w;
-	nw--;
+        r += w;
+        nw--;
       }
       return std::tuple{w,nw,r-r/2,r/2};
     };
-    
+
     auto populate_gates = [partition,&ngates] (bool nand_stage, u64 n) {
       assert(n>0);
       if (n==1) return u64(0);
@@ -1142,14 +1142,14 @@ namespace hcm {
       f64 path_le = 1;
       bool nand_stage = nandfirst;
       while (n>1) {
-	auto [w,nw,w2,w3] = partition(n);
-	u64 width = (nw==0)? w2 : w;
-	assert(width!=0);
-	path_le *= gate[nand_stage][width].logical_effort();
-	n = nw;
-	if (w2) n++;
-	if (w3) n++;
-	nand_stage ^= 1;
+        auto [w,nw,w2,w3] = partition(n);
+        u64 width = (nw==0)? w2 : w;
+        assert(width!=0);
+        path_le *= gate[nand_stage][width].logical_effort();
+        n = nw;
+        if (w2) n++;
+        if (w3) n++;
+        nand_stage ^= 1;
       }
       return path_le;
     };
@@ -1191,7 +1191,7 @@ namespace hcm {
       f64 cload = (width!=0)? gate[nand_stage^1][width].icap(next_scale) : (depth>1)? inv{}.icap(next_scale) : co;
       circuit stage;
       for (u64 w=1; w<=ARITY; w++) {
-	stage = stage || (gate[nand_stage][w].make(cload,scale,bias) * ngates[nand_stage][w]);
+        stage = stage || (gate[nand_stage][w].make(cload,scale,bias) * ngates[nand_stage][w]);
       }
       tree = tree + stage;
       bias = mypow(bias,prev_width); // each NAND/NOR stage reduces switching probability (neglect glitching)
@@ -1200,15 +1200,15 @@ namespace hcm {
       nand_stage ^= 1;
       if (width!=0) n = std::accumulate(ngates[nand_stage]+1,ngates[nand_stage]+1+ARITY,0);
     } while (width!=0);
-    
+
     if (ninv!=0) {
       // add inverters
       for (u64 i=0; i<ninv; i++) {
-	f64 next_scale = scale * stage_effort;
-	f64 cload = (depth>1)? inv{}.icap(next_scale) : co;
-	tree = tree + inv{}.make(cload,scale,bias);
-	depth--;
-	scale = next_scale;
+        f64 next_scale = scale * stage_effort;
+        f64 cload = (depth>1)? inv{}.icap(next_scale) : co;
+        tree = tree + inv{}.make(cload,scale,bias);
+        depth--;
+        scale = next_scale;
       }
     }
     assert(depth==0);
@@ -1222,12 +1222,12 @@ namespace hcm {
     return nand_nor_tree<SE,SMAX>(n,true,false,co,scale,bias);
   }
 
-  
+
   template<f64 SE=DSE, f64 SMAX=DSMAX>
   constexpr circuit oring(u64 n, f64 co, f64 scale=1, f64 bias=0.5)
   {
     return nand_nor_tree<SE,SMAX>(n,false,false,co,scale,bias);
-  }  
+  }
 
 
   template<f64 SE=DSE, f64 SMAX=DSMAX>
@@ -1241,7 +1241,7 @@ namespace hcm {
   constexpr circuit noring(u64 n, f64 co, f64 scale=1, f64 bias=0.5)
   {
     return nand_nor_tree<SE,SMAX>(n,false,true,co,scale,bias);
-  }  
+  }
 
 
   constexpr circuit xor2(f64 co, f64 bias=0.5)
@@ -1343,15 +1343,15 @@ namespace hcm {
       assert(w>1);
       mux_inv_tri muxi{w};
       if (w==2) {
-	// single select signal
-	f64 selcap = (muxi.icap<1>() + muxi.icap<2>()) * nmuxes * m;
-	return buffer<SE,SMAX>(selcap,true) |  buffer<SE,SMAX>(selcap,false);
+        // single select signal
+        f64 selcap = (muxi.icap<1>() + muxi.icap<2>()) * nmuxes * m;
+        return buffer<SE,SMAX>(selcap,true) |  buffer<SE,SMAX>(selcap,false);
       } else {
-	assert(w>2);
-	f64 selcap = muxi.icap<1>() * nmuxes * m;
-	f64 cselcap = muxi.icap<2>() * nmuxes * m;
-	circuit sel = buffer<SE,SMAX>(selcap,false) | buffer<SE,SMAX>(cselcap,true);
-	return decode1<SE,SMAX>(w,sel.ci) + sel * w;
+        assert(w>2);
+        f64 selcap = muxi.icap<1>() * nmuxes * m;
+        f64 cselcap = muxi.icap<2>() * nmuxes * m;
+        circuit sel = buffer<SE,SMAX>(selcap,false) | buffer<SE,SMAX>(cselcap,true);
+        return decode1<SE,SMAX>(w,sel.ci) + sel * w;
       }
     };
 
@@ -1363,9 +1363,9 @@ namespace hcm {
     while (n>1) {
       nstages++;
       if constexpr (ARITY>2) {
-	if ((nstages & 1)==0 && (n+1)==ARITY) {
-	  n++; // last stage = MUX with unused input
-	}
+        if ((nstages & 1)==0 && (n+1)==ARITY) {
+          n++; // last stage = MUX with unused input
+        }
       }
       u64 w = ARITY;
       while (w>n) w>>=1;
@@ -1378,18 +1378,18 @@ namespace hcm {
       circuit sel_stage;
       circuit mux_stage;
       if (std::has_single_bit(r)) {
-	// one smaller MUX
-	if (r==1) {
-	  // just an inverter
-	  mux_stage = mux_stage || inv{}.make(cload);
-	} else {
-	  sel_stage = sel_stage | selector(r,1);
-	  mux_stage = mux_stage || multiplexer(r,cload);
-	}
+        // one smaller MUX
+        if (r==1) {
+          // just an inverter
+          mux_stage = mux_stage || inv{}.make(cload);
+        } else {
+          sel_stage = sel_stage | selector(r,1);
+          mux_stage = mux_stage || multiplexer(r,cload);
+        }
       } else if (r!=0) {
-	// one extra MUX with unused inputs
-	nw++;
-	r = 0;
+        // one extra MUX with unused inputs
+        nw++;
+        r = 0;
       }
       sel_stage = sel_stage | selector(w,nw);
       mux_stage = mux_stage || multiplexer(w,cload) * nw;
@@ -1405,7 +1405,7 @@ namespace hcm {
     return std::array{sel,data};
   }
 
-  
+
   template<f64 SE=DSE, f64 SMAX=DSMAX>
   constexpr auto mux(u64 n/*inputs (data)*/, u64 m/*bits per input*/, f64 co)
   {
@@ -1460,7 +1460,7 @@ namespace hcm {
       return grid_demux(nbits,nx,(ny+1)/2,dx,dy*2,demux.ci,abits+1) + demux;
     }
   }
-  
+
 
   template<f64 SE=DSE, f64 SMAX=DSMAX>
   constexpr auto grid_mux_preselect(u64 nbits, u64 nx, u64 ny, f64 dx/*um*/, f64 dy/*um*/, bool init=1, bool pol=0)
@@ -1568,18 +1568,18 @@ namespace hcm {
       f64 x0 = mysqrt(mysqrt(b/a));
       f64 x1 = x0 / (1.-1./(4*a*mypow(x0,3)));
       if (x1 >= x0) {
-	// always true if co has reasonable value (>=INVCAP)
-	assert(f(x0)<=x0 && f(x1)>=x1);
-	f64 xm = (x0+x1)/2;
-	for (u64 i=0; i<20; i++) {
-	  if (f(xm)<xm) {
-	    x0 = xm;
-	  } else {
-	    x1 = xm;
-	  }
-	}
-	scale_aoi = std::max(1.,xm*xm * or_nand{}.icap<1>() / co);
-	scale_oai = std::max(1.,xm);
+        // always true if co has reasonable value (>=INVCAP)
+        assert(f(x0)<=x0 && f(x1)>=x1);
+        f64 xm = (x0+x1)/2;
+        for (u64 i=0; i<20; i++) {
+          if (f(xm)<xm) {
+            x0 = xm;
+          } else {
+            x1 = xm;
+          }
+        }
+        scale_aoi = std::max(1.,xm*xm * or_nand{}.icap<1>() / co);
+        scale_oai = std::max(1.,xm);
       }
       circuit oai = or_nand{}.make(co,scale_oai);
       f64 coai1 = or_nand{}.icap<0>(scale_oai);
@@ -1619,11 +1619,11 @@ namespace hcm {
     circuit bwp; // bitwise propagate
     if constexpr (! INCR) {
       if (n==2) {
-	bwg = nand{2}.make(G[0].icap<1>()+sum.ci) * n;
-	bwp = nor{2}.make(G[0].icap<1>()+sum.ci) * (n-1);
+        bwg = nand{2}.make(G[0].icap<1>()+sum.ci) * n;
+        bwp = nor{2}.make(G[0].icap<1>()+sum.ci) * (n-1);
       } else {
-	bwg = nand{2}.make(G[0].icap<0>()+G[0].icap<1>()) * n;
-	bwp = nor{2}.make(G[0].icap<1>()+2*P[0].icap()) * (n-1);
+        bwg = nand{2}.make(G[0].icap<0>()+G[0].icap<1>()) * n;
+        bwp = nor{2}.make(G[0].icap<1>()+2*P[0].icap()) * (n-1);
       }
     }
     circuit carryout;
@@ -1641,18 +1641,18 @@ namespace hcm {
       u64 n1 = ng - n2; // cells with single consumer
       u64 np1 = std::min(n1,np); // P cells with single consumer
       if (i < (depth-1)) {
-	f64 cog1 = G[(i+1)&1].icap<0>();
-	f64 cog2 = G[(i+1)&1].icap<0>() + G[(i+1)&1].icap<1>();
-	f64 cop1 = G[(i+1)&1].icap<1>() + P[(i+1)&1].icap();
-	f64 cop2 = G[(i+1)&1].icap<1>() + 2 * P[(i+1)&1].icap();
-	circuit g = (G[i&1].make(cog1) * n1) || (G[i&1].make(cog2) * (ng-n1));
-	circuit p = (P[i&1].make(cop1) * np1) || (P[i&1].make(cop2) * (np-np1));
-	tree = tree + (g | p);
+        f64 cog1 = G[(i+1)&1].icap<0>();
+        f64 cog2 = G[(i+1)&1].icap<0>() + G[(i+1)&1].icap<1>();
+        f64 cop1 = G[(i+1)&1].icap<1>() + P[(i+1)&1].icap();
+        f64 cop2 = G[(i+1)&1].icap<1>() + 2 * P[(i+1)&1].icap();
+        circuit g = (G[i&1].make(cog1) * n1) || (G[i&1].make(cog2) * (ng-n1));
+        circuit p = (P[i&1].make(cop1) * np1) || (P[i&1].make(cop2) * (np-np1));
+        tree = tree + (g | p);
       } else {
-	// last generate stage
-	assert(np==0 && np1==0 && ng==n1);
-	f64 cog1 = (n1==1)? carryout.ci : sum.ci;
-	tree = tree + G[i&1].make(cog1) * n1;
+        // last generate stage
+        assert(np==0 && np1==0 && ng==n1);
+        f64 cog1 = (n1==1)? carryout.ci : sum.ci;
+        tree = tree + G[i&1].make(cog1) * n1;
       }
     }
     circuit adder = (tree | bws) + (sum || carryout); // large input capacitance (12 CGATE)
@@ -1668,7 +1668,7 @@ namespace hcm {
     // TODO: can we specialize the adder and get rid of the inverter delay?
   }
 
-  
+
   constexpr circuit csa_tree(const std::vector<u64> &icount, f64 co, std::vector<f64> &loadcap, u64 obits=0)
   {
     // tree of full adders (FA) and half adders (HA)
@@ -1688,23 +1688,23 @@ namespace hcm {
       u64 i2 = 0;
       bool need_cpa = false;
       for (u64 i=0; i<=n; i++) {
-	if (i==n || icount.at(i)==0) {
-	  if (need_cpa) {
-	    circuit cpa = adder_ks(i-i2,co);
-	    output = output || cpa;
-	    for (u64 j=i2; j<i; j++) loadcap.push_back(cpa.ci);
-	    need_cpa = false;
-	  }
-	  if (i<n) loadcap.push_back(0);
-	} else if (! need_cpa) {
-	  if (icount.at(i)==1) {
-	    loadcap.push_back(co);
-	  } else {
-	    assert(icount.at(i)==2);
-	    need_cpa = true;
-	    i2 = i;
-	  }
-	}
+        if (i==n || icount.at(i)==0) {
+          if (need_cpa) {
+            circuit cpa = adder_ks(i-i2,co);
+            output = output || cpa;
+            for (u64 j=i2; j<i; j++) loadcap.push_back(cpa.ci);
+            need_cpa = false;
+          }
+          if (i<n) loadcap.push_back(0);
+        } else if (! need_cpa) {
+          if (icount.at(i)==1) {
+            loadcap.push_back(co);
+          } else {
+            assert(icount.at(i)==2);
+            need_cpa = true;
+            i2 = i;
+          }
+        }
       }
       return output;
     }
@@ -1718,8 +1718,8 @@ namespace hcm {
       n2[i] = 0;
       u64 r = icount.at(i)%3;
       if (r==2) {
-	n2[i] = 1;
-	r = 0;
+        n2[i] = 1;
+        r = 0;
       }
       ocount.at(i) += n3[i] + n2[i] + r;
       ocount.at(i+1) += n3[i] + n2[i];
@@ -1780,8 +1780,8 @@ namespace hcm {
     std::vector<u64> count (cols,0); // number of bits per CSA column
     for (u64 i=0; i<N.size(); i++) {
       if (N[i])
-	for (u64 j=0; j<m; j++)
-	  if (i+j < cols) count.at(i+j)++;
+        for (u64 j=0; j<m; j++)
+          if (i+j < cols) count.at(i+j)++;
     }
     std::vector<f64> loadcap;
     circuit sum = csa_tree(count,co,loadcap,obits); // sum all partial products
@@ -1790,8 +1790,8 @@ namespace hcm {
     for (u64 j=0; j<m; j++) {
       f64 icap = 0;
       for (u64 i=0; i<N.size(); i++) {
-	if ((i+j) < loadcap.size() && N[i])
-	  icap += loadcap.at(i+j);
+        if ((i+j) < loadcap.size() && N[i])
+          icap += loadcap.at(i+j);
       }
       buf = buf || buffer(icap,false);
     }
@@ -1861,10 +1861,10 @@ namespace hcm {
     for (u64 step=std::bit_floor(N-1); step>=1; step/=2) {
       circuit stage;
       for (u64 i=N-1; i>=step; i--) {
-	if (i+step*2 < N) loadcap[i] += loadcap[i+step*2];
-	circuit c = op(loadcap[i]);
-	stage = stage || c;
-	loadcap[i] = c.ci;
+        if (i+step*2 < N) loadcap[i] += loadcap[i+step*2];
+        circuit c = op(loadcap[i]);
+        stage = stage || c;
+        loadcap[i] = c.ci;
       }
       tree = stage + tree;
     }
@@ -1894,25 +1894,25 @@ namespace hcm {
     if (pol) {
       // odd number of computation stages: end with a stage of inverters
       for (u64 i=0; i<N; i++) {
-	circuit c = inv{}.make(loadcap[i]) * data;
-	tree = tree || c;
-	loadcap[i] = c.ci;
+        circuit c = inv{}.make(loadcap[i]) * data;
+        tree = tree || c;
+        loadcap[i] = c.ci;
       }
     }
     for (u64 step=std::bit_floor(N-1); step>=1; step/=2) {
       circuit stage;
       for (u64 i=N-1; i>=step; i--) {
-	if (i+step*2 < N) loadcap[i] += loadcap[i+step*2];
-	circuit c = op[pol](loadcap[i]);
-	stage = stage || c;
-	loadcap[i] = c.ci;
+        if (i+step*2 < N) loadcap[i] += loadcap[i+step*2];
+        circuit c = op[pol](loadcap[i]);
+        stage = stage || c;
+        loadcap[i] = c.ci;
       }
       // inverters are used to propagate values that are computed earlier than the last stage
       // (FIXME: some inverters are unnecessary)
       for (u64 i=0; i<step; i++) {
-	circuit c = inv{}.make(loadcap[i]) * data;
-	stage = stage || c;
-	loadcap[i] = c.ci;
+        circuit c = inv{}.make(loadcap[i]) * data;
+        stage = stage || c;
+        loadcap[i] = c.ci;
       }
       tree = stage + tree;
       pol ^= 1;
@@ -1921,7 +1921,7 @@ namespace hcm {
     for (u64 i=0; i<N-1; i++)
       loadcap[i] += loadcap[i+1];
     tree.ci = *std::max_element(loadcap,loadcap+N);
-    return tree;    
+    return tree;
   }
 
 
@@ -1939,7 +1939,7 @@ namespace hcm {
     assert(n!=0);
     basic_gate I[2] = {nor{2},nand{2}}; // initial G stage, depending on polarity
     basic_gate G[2] = {and_nor{},or_nand{}}; // reduction stage G, depending on polarity
-    basic_gate E[2] = {nand{2},nor{2}}; // reduction stage E, depending on polarity      
+    basic_gate E[2] = {nand{2},nor{2}}; // reduction stage E, depending on polarity
     if (n==1) {
       circuit c = inv{}.make(I[gte].icap()) + I[gte].make(co);
       c.ci = std::max(c.ci,I[gte].icap());
@@ -1951,7 +1951,7 @@ namespace hcm {
     f64 cgleft = G[pol].icap<0>();
     f64 celeft = G[pol].icap<1>() + E[pol^1].icap();
     f64 cgright = G[pol].icap<2>();
-    f64 ceright = E[pol].icap();          
+    f64 ceright = E[pol].icap();
     circuit gleft = (inv{}.make(I[gte].icap()) + I[gte].make(cgleft)) * (n/2);
     gleft.ci = std::max(gleft.ci,I[gte].icap());
     circuit gright = (inv{}.make(I[gte].icap()) + I[gte].make(cgright)) * (n/2);
@@ -1968,29 +1968,29 @@ namespace hcm {
       u64 nextn = n-nops; // value of n for the next stage
       circuit stage;
       if (nextn == 1) {
-	// last reduction stage
-	f64 ocap = (pol==gte)? inv{}.icap() : co;
-	stage = G[pol].make(ocap); // the E circuit is not needed
+        // last reduction stage
+        f64 ocap = (pol==gte)? inv{}.icap() : co;
+        stage = G[pol].make(ocap); // the E circuit is not needed
       } else {
-	// next stage is a reduction stage
-	f64 cgleft = G[pol^1].icap<0>();
-	f64 celeft = G[pol^1].icap<1>() + E[pol^1].icap();
-	f64 cgright = G[pol^1].icap<2>();
-	f64 ceright = E[pol^1].icap();
-	u64 nextnops = nextn/2; // >=1
-	u64 nopsfeedright = nextnops; // >=1
-	u64 nopsfeedleft = nextnops - (n%2) * (1-nextn%2);
-	// when n is odd, transmit the remaining bundle (g,e) through a pair of inverters
-	u64 nopsfeedinv = (1-n%2) * (nextn%2);
-	u64 ninvfeedleft = nextnops - nopsfeedleft;
-	u64 ninvfeedinv = (n%2) * (nextn%2);
-	circuit opsfeedleft = (G[pol].make(cgleft) | E[pol].make(celeft)) * nopsfeedleft;
-	// the rightmost E circuit is not needed
-	circuit opsfeedright = G[pol].make(cgright) * nopsfeedright | E[pol].make(ceright) * (nopsfeedright-1);
-	circuit opsfeedinv = (G[pol].make(INVCAP) | E[pol].make(INVCAP)) * nopsfeedinv;
-	circuit invfeedleft = (inv{}.make(cgleft) | inv{}.make(celeft)) * ninvfeedleft;
-	circuit invfeedinv = inv{}.make(INVCAP) * (2 * ninvfeedinv); // FIXME: unneeded
-	stage = opsfeedleft || opsfeedright || opsfeedinv || invfeedleft || invfeedinv;
+        // next stage is a reduction stage
+        f64 cgleft = G[pol^1].icap<0>();
+        f64 celeft = G[pol^1].icap<1>() + E[pol^1].icap();
+        f64 cgright = G[pol^1].icap<2>();
+        f64 ceright = E[pol^1].icap();
+        u64 nextnops = nextn/2; // >=1
+        u64 nopsfeedright = nextnops; // >=1
+        u64 nopsfeedleft = nextnops - (n%2) * (1-nextn%2);
+        // when n is odd, transmit the remaining bundle (g,e) through a pair of inverters
+        u64 nopsfeedinv = (1-n%2) * (nextn%2);
+        u64 ninvfeedleft = nextnops - nopsfeedleft;
+        u64 ninvfeedinv = (n%2) * (nextn%2);
+        circuit opsfeedleft = (G[pol].make(cgleft) | E[pol].make(celeft)) * nopsfeedleft;
+        // the rightmost E circuit is not needed
+        circuit opsfeedright = G[pol].make(cgright) * nopsfeedright | E[pol].make(ceright) * (nopsfeedright-1);
+        circuit opsfeedinv = (G[pol].make(INVCAP) | E[pol].make(INVCAP)) * nopsfeedinv;
+        circuit invfeedleft = (inv{}.make(cgleft) | inv{}.make(celeft)) * ninvfeedleft;
+        circuit invfeedinv = inv{}.make(INVCAP) * (2 * ninvfeedinv); // FIXME: unneeded
+        stage = opsfeedleft || opsfeedright || opsfeedinv || invfeedleft || invfeedinv;
       }
       tree = tree + stage;
       n = nextn;
@@ -2016,7 +2016,7 @@ namespace hcm {
     std::array<u64,M> col1 {}; // number of ones per column
     for (u64 i=0; i<N; i++) {
       for (u64 j=0; j<M; j++) {
-	col1[j] += data[i][j];
+        col1[j] += data[i][j];
       }
     }
     circuit cols;
@@ -2031,7 +2031,7 @@ namespace hcm {
     for (u64 i=0; i<N; i++) {
       f64 loadcap = 0;
       for (u64 j=0; j<M; j++) {
-	loadcap += col[j].ci * data[i][j];
+        loadcap += col[j].ci * data[i][j];
       }
       maxloadcap = std::max(maxloadcap,loadcap);
     }
@@ -2063,7 +2063,7 @@ namespace hcm {
       constexpr u64 OBITS = N - std::bit_width(D) + 1; // output bits
       std::array<std::bitset<OBITS>,romsize> data;
       for (u64 i=0; i<romsize; i++) {
-	data.at(i) = i / D;
+        data.at(i) = i / D;
       }
       return pseudo_rom<romsize,OBITS>(data,co);
     } else {
@@ -2077,8 +2077,8 @@ namespace hcm {
       std::array<bool,N+M+1> IDP1 {}; // INVD+1
       std::copy(INVD.begin(),INVD.end(),IDP1.begin());
       for (u64 i=0; i<IDP1.size(); i++) {
-	IDP1[i] ^= 1;
-	if (IDP1[i]) break;
+        IDP1[i] ^= 1;
+        if (IDP1[i]) break;
       }
       // TODO: full multiplier not needed (N+M rightmost result bits ignored)
       return multiply_by_constant(IDP1,N,co);
@@ -2116,7 +2116,7 @@ namespace hcm {
     static_assert(D!=0);
     static_assert(N!=0);
     constexpr u64 R = 8; // log2 ROM size
-    constexpr u64 MAXKM = 12; // digital root method (2^K-1 mod D = 0), max bits per digit 
+    constexpr u64 MAXKM = 12; // digital root method (2^K-1 mod D = 0), max bits per digit
     constexpr u64 MAXKP = 6; // digital root method (2^K+1 mod D = 0), max bits per digit
     constexpr u64 OBITS = std::bit_width(D-1); // number of output bits
 
@@ -2126,7 +2126,7 @@ namespace hcm {
       return {};
     } else if constexpr ((D&1)==0) {
       // even divisor
-      // x mod I*J = I*[(x div I) mod J] + (x mod I) 
+      // x mod I*J = I*[(x div I) mod J] + (x mod I)
       constexpr u64 factor2 = std::countr_zero(D);
       static_assert(factor2!=0);
       constexpr u64 Dodd = D >> factor2;
@@ -2172,7 +2172,7 @@ namespace hcm {
       constexpr u64 romsize = u64(1) << N;
       std::array<std::bitset<OBITS>,romsize> data;
       for (u64 i=0; i<romsize; i++) {
-	data.at(i) = i % D;
+        data.at(i) = i % D;
       }
       return pseudo_rom<romsize,OBITS>(data,co);
     }
@@ -2192,16 +2192,16 @@ namespace hcm {
       constexpr u64 ncols = std::max(K,OBITS);
       std::vector<u64> count (ncols,0);
       for (u64 i=0; i<K; i++)
-	count.at(i) = (N%K==0 || i<N%K)? ND : ND-1;
+        count.at(i) = (N%K==0 || i<N%K)? ND : ND-1;
       for (u64 i=0; i<OBITS; i++)
-	count.at(i) += EXTRA[i]; // extra summand
+        count.at(i) += EXTRA[i]; // extra summand
       std::vector<f64> loadcap;
       circuit csa = csa_tree(count,reduc.ci,loadcap);
       assert(loadcap.size()>=K);
       // every other digit is complemented
       circuit bufs;
       for (u64 i=0; i<N; i++)
-	bufs = bufs || buffer(loadcap[i%K],(i/K)&1);
+        bufs = bufs || buffer(loadcap[i%K],(i/K)&1);
       return bufs + csa + reduc;
     } else {
       // odd divisor, general method (inefficient)
@@ -2214,8 +2214,8 @@ namespace hcm {
       std::array<bool,N+M+1> IDP1 {}; // INVD+1
       std::copy(INVD.begin(),INVD.end(),IDP1.begin());
       for (u64 i=0; i<IDP1.size(); i++) {
-	IDP1[i] ^= 1;
-	if (IDP1[i]) break;
+        IDP1[i] ^= 1;
+        if (IDP1[i]) break;
       }
       constexpr std::bitset<std::bit_width(D)> Dbits {D};
       circuit mulD = multiply_by_constant(Dbits,N+M,co); // TODO: N+M rightmost result bits ignored
@@ -2268,7 +2268,7 @@ namespace hcm {
 
   // ######################################################
   // SRAM
-  
+
   template<typename T>
   struct sram_common {
     static constexpr u64 NBITS = T::num_bits();
@@ -2288,7 +2288,7 @@ namespace hcm {
     static constexpr f64 area_mm2()
     {
       return area_um2() / 1000000;
-    }    
+    }
 
     static constexpr f64 leakage_mW()
     {
@@ -2328,7 +2328,7 @@ namespace hcm {
   template<u64 N, u64 M, u64 D>
   struct sram_bank {};
 
-  
+
   template<u64 N, u64 M>
   struct sram_bank<N,M,0> : sram_common<sram_null>
   {
@@ -2390,8 +2390,8 @@ namespace hcm {
       // t0 = Rbl*Cbl*(Cbl+3Csa)/(6Cbl+6Csa)
       f64 CBL = N * BLCAP_pF; // fF
       f64 RBL = N * BLRES; // Ohm
-      f64 T0 = RBL * CBL * (CBL+3*SACAP_pF) / (6*(CBL+SACAP_pF)); // ps      
-      return T0;     
+      f64 T0 = RBL * CBL * (CBL+3*SACAP_pF) / (6*(CBL+SACAP_pF)); // ps
+      return T0;
     } ();
 
     static constexpr f64 BLDELAY = []() { // bitline total delay (ps)
@@ -2409,7 +2409,7 @@ namespace hcm {
     static constexpr f64 SEFF = 4;
 
     static constexpr circuit RDEC = decode2<SEFF,SY>(N,M*WLCAP,SRAM_CELL.bitline_length); // row decoder
-    
+
     // TODO: SA inverters are skewed
     // TODO: SA footer transistor (big capacitance)
     static constexpr circuit SA = inv{}.make(SACAP,SASCALE) * 2 * M; // sense amplifiers
@@ -2423,33 +2423,33 @@ namespace hcm {
       circuit BLBUF = buffer<SEFF,SX>(N*BLCAP,false) | buffer<SEFF,SX>(N*BLCAP,true);
       // assume last inverter of buffer is tristate (impact on delay not modeled, TODO)
       if constexpr (D<M) {
-	// data bits are interleaved
-	// separate column decoder drives tristates
-	constexpr u64 DEMUX = M/D;
-	assert(DEMUX >= 2);
-	f64 CTRI = 2 * N*BLCAP * TAU_ps / BLBUF.d; // input cap of tristate select (FIXME)
-	if constexpr (DEMUX <= 16) {
-	  // decode outputs run parallel to wordlines
-	  f64 CSEL = CTRI*D + WWCAP*M;
-	  circuit BUFTRI = buffer(CSEL,false) | buffer(CSEL,true);
-	  circuit CDEC = decode2(DEMUX,BUFTRI.ci);
-	  wdr[0] = CDEC + BUFTRI * DEMUX;
-	  wdr[0].e += energy_fJ(WWCAP*M*CGATE_fF,VDD); // two wires switch (worst case)
-	} else {
-	  // predecode outputs run parallel to wordlines, AND2 gates are replicated (D replicas)
-	  circuit BUFTRI = buffer<SEFF>(CTRI,false) | buffer<SEFF>(CTRI,true);
-	  circuit CDEC = decode2_rep(DEMUX, BUFTRI.ci, SRAM_CELL.wordline_length, D);
-	  wdr[0] = CDEC + BUFTRI * M;
-	}
-	wdr[1] = buffer((BLBUF.ci+WWCAP)*DEMUX,false);
-	wdr[1].e += 0.5 * energy_fJ(WWCAP*DEMUX*CGATE_fF,VDD) * 0.5/*switch proba*/;
+        // data bits are interleaved
+        // separate column decoder drives tristates
+        constexpr u64 DEMUX = M/D;
+        assert(DEMUX >= 2);
+        f64 CTRI = 2 * N*BLCAP * TAU_ps / BLBUF.d; // input cap of tristate select (FIXME)
+        if constexpr (DEMUX <= 16) {
+          // decode outputs run parallel to wordlines
+          f64 CSEL = CTRI*D + WWCAP*M;
+          circuit BUFTRI = buffer(CSEL,false) | buffer(CSEL,true);
+          circuit CDEC = decode2(DEMUX,BUFTRI.ci);
+          wdr[0] = CDEC + BUFTRI * DEMUX;
+          wdr[0].e += energy_fJ(WWCAP*M*CGATE_fF,VDD); // two wires switch (worst case)
+        } else {
+          // predecode outputs run parallel to wordlines, AND2 gates are replicated (D replicas)
+          circuit BUFTRI = buffer<SEFF>(CTRI,false) | buffer<SEFF>(CTRI,true);
+          circuit CDEC = decode2_rep(DEMUX, BUFTRI.ci, SRAM_CELL.wordline_length, D);
+          wdr[0] = CDEC + BUFTRI * M;
+        }
+        wdr[1] = buffer((BLBUF.ci+WWCAP)*DEMUX,false);
+        wdr[1].e += 0.5 * energy_fJ(WWCAP*DEMUX*CGATE_fF,VDD) * 0.5/*switch proba*/;
       }
       wdr[1] = wdr[1] * D + BLBUF * M;
       return wdr;
     } ();
 
     static constexpr f64 COLSELCAP = CMUX[0].ci + WDR[0].ci;
-    static constexpr circuit ABUS = (buffer(RDEC.ci,false) * std::bit_width(N-1)) || (buffer(COLSELCAP,false) * std::bit_width(M/D-1));   
+    static constexpr circuit ABUS = (buffer(RDEC.ci,false) * std::bit_width(N-1)) || (buffer(COLSELCAP,false) * std::bit_width(M/D-1));
     static constexpr const circuit &WBUS = WDR[1];
     static constexpr circuit WLSEL = ABUS + RDEC;
 
@@ -2499,8 +2499,8 @@ namespace hcm {
       WLSEL.print("wordline select: ",os);
       //SA.print("sense amps: ",os);
       if constexpr (D<M) {
-	CMUX[0].print("column mux select: ",os);
-	CMUX[1].print("column mux data: ",os);
+        CMUX[0].print("column mux select: ",os);
+        CMUX[1].print("column mux data: ",os);
       }
       WDR[0].print("write driver select: ",os);
       WDR[1].print("write driver data: ",os);
@@ -2521,7 +2521,7 @@ namespace hcm {
       //os << "height (um): " << sram_bank::HEIGHT << std::endl;
       os << "array efficiency: " << CELLS_AREA/AREA << std::endl;
     }
-    
+
   };
 
 
@@ -2534,7 +2534,7 @@ namespace hcm {
     static constexpr u64 R = D%M; // extra bank provides R remaining bits
     using BANK = sram_bank<N,M,M>;
     using BANKR = sram_bank<N,R,R>;
-    
+
     // send address to all banks
     static constexpr u64 ADDRESS_BITS = std::bit_width(N-1);
     static constexpr f64 LENGTH = BANK::WIDTH * NB + BANKR::WIDTH - 0.5 * (BANK::WIDTH + BANKR::WIDTH);
@@ -2542,7 +2542,7 @@ namespace hcm {
     static constexpr circuit AWIRE = wire(LENGTH/2,false,LOADCAP,true);
     static constexpr circuit ABUS = (AWIRE | AWIRE) * ADDRESS_BITS; // address bus
     static constexpr circuit WBUS = BANK::WBUS * NB || BANKR::WBUS;
-    
+
     static constexpr u64 num_bits() {return BANK::NBITS * NB + BANKR::NBITS;}
     static constexpr f64 read_latency() { return ABUS.d + BANK::LATENCY;}
     static constexpr f64 read_energy() {return ABUS.e + BANK::EREAD * NB + BANKR::EREAD;}
@@ -2558,7 +2558,7 @@ namespace hcm {
       ABUS.print("ABUS: ",os);
       BANK::print("BANK: ",os);
       if constexpr (R!=0) {
-	BANKR::print("BANKR: ",os);
+        BANKR::print("BANKR: ",os);
       }
     }
   };
@@ -2591,13 +2591,13 @@ namespace hcm {
     static constexpr u64 ABITS = (N>=2)? std::bit_width(N-1) : 1; // local (bank) address bits
     static constexpr auto ETCW = [] (f64 co){ // edge-to-center wire
       if (BX==1 || BY==1) {
-	circuit c;
-	c.ci = co;
-	return c;
+        circuit c;
+        c.ci = co;
+        return c;
       } else {
-	f64 w = BANK::WIDTH * BX;
-	f64 h = BANK::HEIGHT * BY;
-	return wire(std::min(w,h)/2,false,co);
+        f64 w = BANK::WIDTH * BX;
+        f64 h = BANK::HEIGHT * BY;
+        return wire(std::min(w,h)/2,false,co);
       }
     };
     static constexpr circuit ATREE = grid_demux(ABITS,BX,BY,BANK::WIDTH,BANK::HEIGHT,BANK::ABUS.ci); // address tree
@@ -2640,7 +2640,7 @@ namespace hcm {
     static constexpr u64 num_fins()
     {
       return NB * BANK::FINS + ACC.f + WNET.f + RTREE[0].f + RTREE[1].f;
-    }    
+    }
   };
 
 
@@ -2653,7 +2653,7 @@ namespace hcm {
     ok = ok && (16*E*D <= banksize*banksize || (MAXN>=1024 && MAXM>=512));
     return ok;
   }
-  
+
 
   template<u64 E, u64 D, u64 MAXN, u64 MAXM>
   struct sram_banked;
@@ -2674,55 +2674,55 @@ namespace hcm {
       constexpr f64 FACTOR = std::max(2.,BIAR*BIAR);
       static_assert(FACTOR>=1);
       if constexpr (R <= W * SRAM_CELL.aspect_ratio * FACTOR) {
-	// single column
-	return {1/*BX*/,(R+N-1)/N/*BY*/};
+        // single column
+        return {1/*BX*/,(R+N-1)/N/*BY*/};
       } else {
-	// multiple columns (BY=2^k)
-	// we want squarish shape
-	constexpr f64 S = mysqrt(R*W*SRAM_CELL.aspect_ratio); // square side
-	static_assert(S>=N);
-	static_assert(S<=R);
-	constexpr u64 BY = std::min(to_pow2(S/N),std::bit_floor(R/N));
-	static_assert(BY>=1 && std::has_single_bit(BY));
-	constexpr u64 BX = (R+BY*N-1)/(BY*N);
-	static_assert(BX>=1);
-	return {BX,BY};
+        // multiple columns (BY=2^k)
+        // we want squarish shape
+        constexpr f64 S = mysqrt(R*W*SRAM_CELL.aspect_ratio); // square side
+        static_assert(S>=N);
+        static_assert(S<=R);
+        constexpr u64 BY = std::min(to_pow2(S/N),std::bit_floor(R/N));
+        static_assert(BY>=1 && std::has_single_bit(BY));
+        constexpr u64 BX = (R+BY*N-1)/(BY*N);
+        static_assert(BX>=1);
+        return {BX,BY};
       }
     }
 
     static constexpr auto params = []() {
       if constexpr (D > MAXM) {
-	// data width = bank width
-	constexpr u64 M = MAXM;
-	if constexpr (E <= MAXN) {
-	  // single bank
-	  return std::tuple{1/*BX*/,1/*BY*/,E/*N*/,M};
-	} else {
-	  // multiple banks (N=MAXN)
-	  auto [BX,BY] = banking<E,D>();
-	  return std::tuple{BX,BY,MAXN,M};
-	}
+        // data width = bank width
+        constexpr u64 M = MAXM;
+        if constexpr (E <= MAXN) {
+          // single bank
+          return std::tuple{1/*BX*/,1/*BY*/,E/*N*/,M};
+        } else {
+          // multiple banks (N=MAXN)
+          auto [BX,BY] = banking<E,D>();
+          return std::tuple{BX,BY,MAXN,M};
+        }
       } else {
-	// D <= MAXM
-	constexpr u64 MAXK = std::bit_floor(MAXM/D);
-	if constexpr (E <= MAXN*MAXK) {
-	  // single bank
-	  u64 K = MAXK;
-	  u64 N = (E+K-1)/K;
-	  // we want squarish shape
-	  while (K*D*SRAM_CELL.aspect_ratio > 2*N && K>=2 && (E+K/2-1)/(K/2)<=MAXN) {
-	    K /= 2;
-	    N = (E+K-1)/K;
-	  }
-	  u64 M = K * D;
-	  return std::tuple{1/*BX*/,1/*BY*/,N,M};
-	} else {
-	  // multiple banks (N=MAXN)
-	  constexpr u64 M = MAXK * D;
-	  constexpr u64 EK = (E+MAXK-1) / MAXK;
-	  auto [BX,BY] = banking<EK,M>();
-	  return std::tuple{BX,BY,MAXN,M};
-	}
+        // D <= MAXM
+        constexpr u64 MAXK = std::bit_floor(MAXM/D);
+        if constexpr (E <= MAXN*MAXK) {
+          // single bank
+          u64 K = MAXK;
+          u64 N = (E+K-1)/K;
+          // we want squarish shape
+          while (K*D*SRAM_CELL.aspect_ratio > 2*N && K>=2 && (E+K/2-1)/(K/2)<=MAXN) {
+            K /= 2;
+            N = (E+K-1)/K;
+          }
+          u64 M = K * D;
+          return std::tuple{1/*BX*/,1/*BY*/,N,M};
+        } else {
+          // multiple banks (N=MAXN)
+          constexpr u64 M = MAXK * D;
+          constexpr u64 EK = (E+MAXK-1) / MAXK;
+          auto [BX,BY] = banking<EK,M>();
+          return std::tuple{BX,BY,MAXN,M};
+        }
       }
     } ();
 
@@ -2758,7 +2758,7 @@ namespace hcm {
 
   template<u64 E, u64 D, u64 MAXN, u64 MAXM> requires (! ok_config(E,D,MAXN,MAXM))
   struct sram_banked<E,D,MAXN,MAXM> : sram_common<sram_null> {
-    static constexpr bool ok = false; 
+    static constexpr bool ok = false;
   };
 
 
@@ -2795,7 +2795,7 @@ namespace hcm {
   inline constexpr f64 OUTCAP = INVCAP;
 
   inline constexpr circuit INV = inv{}.make(OUTCAP);
-  
+
   template<u64 N>
   inline constexpr circuit AND = anding(N,OUTCAP);
 
@@ -2861,7 +2861,7 @@ namespace hcm {
       circuit input = inv{}.make(prefix_or.ci);
       return input * (N-1) + prefix_or + output * (N-1);
     }
-  }();  
+  }();
 
   // circuit for replicating a value M times
   template<u64 DATABITS, u64 COPIES>
@@ -2938,9 +2938,9 @@ namespace hcm {
       // the ram access point is at the center of the longest edge
       // coordinates in um (integer)
       if (w>h) {
-	return {x+w/2,y};
+        return {x+w/2,y};
       } else {
-	return {x,y+h/2};
+        return {x,y+h/2};
       }
     }
 
@@ -2960,17 +2960,17 @@ namespace hcm {
       std::swap(w,h);
       rotated ^= 1;
       for (auto &p : subs) {
-	assert(p);
-	p->rotate();
+        assert(p);
+        p->rotate();
       }
     }
 
     u64 num_similar(std::span<rectangle*> s) const
     {
       for (auto it=s.begin(); it!=s.end(); it++) {
-	if (! similar(s[0],*it)) {
-	  return std::distance(s.begin(),it);
-	}
+        if (! similar(s[0],*it)) {
+          return std::distance(s.begin(),it);
+        }
       }
       return s.size();
     }
@@ -3007,15 +3007,15 @@ namespace hcm {
       for ([[maybe_unused]] auto &p : s) assert(p->tall());
       u64 n = num_similar(s);
       if (n == s.size()) {
-	// similar rectangles
-	auto [nx,ny] = grid_size(s);
-	w = nx * s[0]->w;
-	h = ny * s[0]->h;
+        // similar rectangles
+        auto [nx,ny] = grid_size(s);
+        w = nx * s[0]->w;
+        h = ny * s[0]->h;
       } else {
-	// two dissimilar rectangles
-	assert(s.size()==2);
-	w = s[0]->w + s[1]->w;
-	h = std::max(s[0]->h,s[1]->h);
+        // two dissimilar rectangles
+        assert(s.size()==2);
+        w = s[0]->w + s[1]->w;
+        h = std::max(s[0]->h,s[1]->h);
       }
       for (auto &p : s) subs.push_back(p);
       if (! tall()) rotate();
@@ -3031,14 +3031,14 @@ namespace hcm {
       sort();
       std::span<rectangle*> s = subs;
       for (u64 i=0; i<s.size()-1; i++) {
-	if (similar(s[i],s[i+1])) {
-	  auto tail = s.last(s.size()-i);
-	  u64 n = num_similar(tail);
-	  rectangle* newrect = new rectangle (s.subspan(i,n));
-	  subs.erase(subs.begin()+i,subs.begin()+i+n);
-	  subs.insert(subs.begin()+i,std::move(newrect));
-	  return true;
-	}
+        if (similar(s[i],s[i+1])) {
+          auto tail = s.last(s.size()-i);
+          u64 n = num_similar(tail);
+          rectangle* newrect = new rectangle (s.subspan(i,n));
+          subs.erase(subs.begin()+i,subs.begin()+i+n);
+          subs.insert(subs.begin()+i,std::move(newrect));
+          return true;
+        }
       }
       return false;
     }
@@ -3057,7 +3057,7 @@ namespace hcm {
     {
       assert(r);
       if (r->empty() || ! r->subs.back()->empty()) {
-	r->subs.push_back(new rectangle);
+        r->subs.push_back(new rectangle);
       }
     }
 
@@ -3078,7 +3078,7 @@ namespace hcm {
     {
       subs.push_back(&p);
     }
-  
+
     void region_contains(rectangle &p)
     {
       if (empty()) new_subrec(this);
@@ -3100,41 +3100,41 @@ namespace hcm {
       y = yy;
       placed = true;
       if (empty()) {
-	return;
+        return;
       } else if (subs.size()==1) {
-	subs[0]->place(x,y);
+        subs[0]->place(x,y);
       } else if (! similar(subs[0],subs[1])) {
-	// two dissimilar rectangles
-	subs[0]->place(x,y);
-	if (rotated) {
-	  subs[1]->place(x,y+subs[0]->h);
-	} else {
-	  subs[1]->place(x+subs[0]->w,y);
-	}
+        // two dissimilar rectangles
+        subs[0]->place(x,y);
+        if (rotated) {
+          subs[1]->place(x,y+subs[0]->h);
+        } else {
+          subs[1]->place(x+subs[0]->w,y);
+        }
       } else {
-	// grid of similar rectangles
-	auto [nx,ny] = grid_size(subs);
-	if (rotated) {
-	  std::swap(nx,ny);
-	  for (u64 i=0; i<subs.size(); i++)
-	    subs[i]->place(x+(i%nx)*subs[0]->w, y+(i/nx)*subs[0]->h);	  
-	} else {
-	  for (u64 i=0; i<subs.size(); i++)
-	    subs[i]->place(x+(i/ny)*subs[0]->w, y+(i%ny)*subs[0]->h);
-	}
+        // grid of similar rectangles
+        auto [nx,ny] = grid_size(subs);
+        if (rotated) {
+          std::swap(nx,ny);
+          for (u64 i=0; i<subs.size(); i++)
+            subs[i]->place(x+(i%nx)*subs[0]->w, y+(i/nx)*subs[0]->h);
+        } else {
+          for (u64 i=0; i<subs.size(); i++)
+            subs[i]->place(x+(i/ny)*subs[0]->w, y+(i%ny)*subs[0]->h);
+        }
       }
     }
 
     void make_tree()
     {
       for (auto &p : subs) {
-	assert(p);
-	if (! p->empty())
-	  p->make_tree();
+        assert(p);
+        if (! p->empty())
+          p->make_tree();
       }
       while (subs.size() > 1) {
-	while (group_similar());
-	group_two_smallest();
+        while (group_similar());
+        group_two_smallest();
       }
       assert(subs.size()==1);
       assert(w==0 && h==0);
@@ -3153,14 +3153,14 @@ namespace hcm {
     void print_rect(std::ostream & os = std::cout)
     {
       if (id < std::numeric_limits<u64>::max()) {
-	u64 randcol = ((color+39) * 10368889)  & 0xFFFFFF;
-	std::string lab = std::to_string(id);
-	if (! label.empty()) lab += "\\n" + label;
-	os << "rect" << id << " [label=\"" << lab << "\", width=" << w << ", height=" << h << ", pos=\"" << x+w/2 << "," << y+h/2 << "!\", fillcolor=\"#" << std::hex << randcol << std::dec << "\"];\n";
+        u64 randcol = ((color+39) * 10368889)  & 0xFFFFFF;
+        std::string lab = std::to_string(id);
+        if (! label.empty()) lab += "\\n" + label;
+        os << "rect" << id << " [label=\"" << lab << "\", width=" << w << ", height=" << h << ", pos=\"" << x+w/2 << "," << y+h/2 << "!\", fillcolor=\"#" << std::hex << randcol << std::dec << "\"];\n";
       }
       for (auto &p : subs) {
-	p->print_rect(os);
-      }    
+        p->print_rect(os);
+      }
     }
 
     void output_floorplan()
@@ -3214,7 +3214,7 @@ namespace hcm {
 
   // ######################################################
   // COUNTERS (STATISTICS)
-  
+
   template<typename T> requires (std::integral<T> || std::floating_point<T>)
   class global {
     friend class ::harcom_superuser;
@@ -3242,7 +3242,7 @@ namespace hcm {
     }
   };
 
-  
+
   // ######################################################
   // REGION
 
@@ -3334,10 +3334,10 @@ namespace hcm {
       u64 use = 0;
       void set(f64 dist)
       {
-	assert(dist>=0);
-	one_wire = wire(dist);
-	delay = one_wire.delay();
-	distance = dist;
+        assert(dist>=0);
+        one_wire = wire(dist);
+        delay = one_wire.delay();
+        distance = dist;
       }
     };
 
@@ -3346,11 +3346,11 @@ namespace hcm {
     void next_cycle()
     {
       if (clock_cycle_ps == 0) {
-	std::cerr << "clock cycle must be non-null" << std::endl;
-	std::terminate();
+        std::cerr << "clock cycle must be non-null" << std::endl;
+        std::terminate();
       }
       for (const auto &r : regions) {
-	r->update_transistors();
+        r->update_transistors();
       }
       cycle++;
     }
@@ -3370,27 +3370,27 @@ namespace hcm {
     {
       assert(r!=nullptr);
       if (id < ram_region.size()) {
-	ram_region[id] = r;
+        ram_region[id] = r;
       } else {
-	assert(id==ram_region.size());
-	ram_region.push_back(r);
+        assert(id==ram_region.size());
+        ram_region.push_back(r);
       }
     }
 
     void check_floorplan() const
     {
       if (rams.size() > 1 && ! floorplan.placed) {
-	std::cerr << "call to make_floorplan() missing" << std::endl;
-	std::terminate();
+        std::cerr << "call to make_floorplan() missing" << std::endl;
+        std::terminate();
       }
     }
 
     region* get_region(u64 ramid) const
     {
       if (ram_region.empty()) {
-	return &default_region;
+        return &default_region;
       } else {
-	return ram_region[ramid];
+        return ram_region[ramid];
       }
     }
 
@@ -3419,14 +3419,14 @@ namespace hcm {
       region *r = get_region(locus);
       r->update_xtors(c.t,c.f);
       if (actual)
-	r->update_energy(c.e);      
+        r->update_energy(c.e);
     }
 
     void add_ram(rectangle &p)
     {
       if (floorplan.placed) {
-	std::cerr << "RAM cannot be created after floorplanning" << std::endl;
-	std::terminate();
+        std::cerr << "RAM cannot be created after floorplanning" << std::endl;
+        std::terminate();
       }
       assert(p.id == rams.size());
       rams.push_back(&p);
@@ -3439,7 +3439,7 @@ namespace hcm {
       assert(r!=nullptr);
       current_region = r;
       if (init) {
-	new_location(r->ramid,r);
+        new_location(r->ramid,r);
       }
     }
 
@@ -3450,25 +3450,25 @@ namespace hcm {
     }
 
     u64 connect_delay([[maybe_unused]] u64 srcid,
-		      [[maybe_unused]] u64 dstid,
-		      [[maybe_unused]] u64 nbits)
+                      [[maybe_unused]] u64 dstid,
+                      [[maybe_unused]] u64 nbits)
     {
 #ifdef FREE_WIRING
       return 0;
 #else
       if (srcid == dstid) {
-	return 0; // no connection
+        return 0; // no connection
       } else {
-	// make_floorplan() must have been called
-	connection &c =  connect[index(srcid,dstid)];
-	region *rs = get_region(srcid);
-	region *rd = get_region(dstid);
-	region *r = (rs==rd)? rs : &default_region;	  
-	r->update_xtors(nbits*c.one_wire.t, nbits*c.one_wire.f);
-	if (exec.active) {
-	  c.use += nbits; // for energy calculation (deferred)
-	}
-	return c.delay;
+        // make_floorplan() must have been called
+        connection &c =  connect[index(srcid,dstid)];
+        region *rs = get_region(srcid);
+        region *rd = get_region(dstid);
+        region *r = (rs==rd)? rs : &default_region;
+        r->update_xtors(nbits*c.one_wire.t, nbits*c.one_wire.f);
+        if (exec.active) {
+          c.use += nbits; // for energy calculation (deferred)
+        }
+        return c.delay;
       }
 #endif
     }
@@ -3484,19 +3484,19 @@ namespace hcm {
       if (connect.empty()) return;
       assert(rams.size() <= ram_region.size());
       for (u64 i=0; i<rams.size(); i++) {
-	for (u64 j=0; j<rams.size(); j++) {
-	  connection &c = connect[index(i,j)];
-	  if (j==i) {
-	    assert(c.use==0);
-	    continue;
-	  }
-	  if (ram_region[i] == ram_region[j]) {
-	    ram_region[i]->update_energy(c.one_wire.e * c.use);
-	  } else {
-	    default_region.update_energy(c.one_wire.e * c.use);
-	  }
-	  c.use = 0;
-	}
+        for (u64 j=0; j<rams.size(); j++) {
+          connection &c = connect[index(i,j)];
+          if (j==i) {
+            assert(c.use==0);
+            continue;
+          }
+          if (ram_region[i] == ram_region[j]) {
+            ram_region[i]->update_energy(c.one_wire.e * c.use);
+          } else {
+            default_region.update_energy(c.one_wire.e * c.use);
+          }
+          c.use = 0;
+        }
       }
     }
 
@@ -3504,13 +3504,13 @@ namespace hcm {
     global<T> total_cost(global<T> region::* stat)
     {
       if constexpr (std::floating_point<T>) {
-	if (stat == &region::energy_fJ) {
-	  update_wiring_energy();
-	}
+        if (stat == &region::energy_fJ) {
+          update_wiring_energy();
+        }
       }
       global<T> sum;
       for (const auto &r : regions) {
-	sum += r->*stat;
+        sum += r->*stat;
       }
       return sum;
     }
@@ -3520,71 +3520,71 @@ namespace hcm {
     auto storage(region &r = default_region)
     {
       if (&r == &default_region) {
-	return total_cost(&region::storage);
+        return total_cost(&region::storage);
       } else {
-	return r.storage;
+        return r.storage;
       }
     }
 
     auto storage_sram(region &r = default_region)
     {
       if (&r == &default_region) {
-	return total_cost(&region::storage_sram);
+        return total_cost(&region::storage_sram);
       } else {
-	return r.storage_sram;
+        return r.storage_sram;
       }
     }
 
     auto energy_fJ(region &r = default_region)
     {
       if (&r == &default_region) {
-	return total_cost(&region::energy_fJ);
+        return total_cost(&region::energy_fJ);
       } else {
-	update_wiring_energy();
-	return r.energy_fJ;
+        update_wiring_energy();
+        return r.energy_fJ;
       }
     }
 
     auto transistors(region &r = default_region)
     {
       if (cycle == first_cycle) {
-	if (&r == &default_region) {
-	  return total_cost(&region::xtors_this_cycle);
-	} else {
-	  return r.xtors_this_cycle;
-	}
+        if (&r == &default_region) {
+          return total_cost(&region::xtors_this_cycle);
+        } else {
+          return r.xtors_this_cycle;
+        }
       } else {
-	if (&r == &default_region) {
-	  return total_cost(&region::transistors);
-	} else {
-	  return r.transistors;
-	}
+        if (&r == &default_region) {
+          return total_cost(&region::transistors);
+        } else {
+          return r.transistors;
+        }
       }
     }
 
     auto xtor_fins(region &r = default_region)
     {
       if (cycle == first_cycle) {
-	if (&r == &default_region) {
-	  return total_cost(&region::fins_this_cycle);
-	} else {
-	  return r.fins_this_cycle;
-	}
+        if (&r == &default_region) {
+          return total_cost(&region::fins_this_cycle);
+        } else {
+          return r.fins_this_cycle;
+        }
       } else {
-	if (&r == &default_region) {
-	  return total_cost(&region::xtor_fins);
-	} else {
-	  return r.xtor_fins;
-	}
+        if (&r == &default_region) {
+          return total_cost(&region::xtor_fins);
+        } else {
+          return r.xtor_fins;
+        }
       }
     }
 
     auto area_sram_mm2(region &r = default_region)
     {
       if (&r == &default_region) {
-	return total_cost(&region::area_sram_mm2);
+        return total_cost(&region::area_sram_mm2);
       } else {
-	return r.area_sram_mm2;
+        return r.area_sram_mm2;
       }
     }
 
@@ -3603,12 +3603,12 @@ namespace hcm {
     void make_floorplan()
     {
       if (floorplan.placed || rams.empty()) {
-	return;
+        return;
       }
       assert(connect.empty());
       if (regions.back()->ramid >= rams.size()) {
-	std::cerr << "region contains no RAMs" << std::endl;
-	std::terminate();
+        std::cerr << "region contains no RAMs" << std::endl;
+        std::terminate();
       }
       floorplan.place();
 #ifdef FLOORPLAN
@@ -3617,12 +3617,12 @@ namespace hcm {
       log2_numrams = std::bit_width(rams.size()-1);
       connect.resize(index(rams.size()-1,rams.size()-1)+1);
       for (u64 i=0; i<rams.size(); i++) {
-	for (u64 j=0; j<rams.size(); j++) {
-	  auto [xi,yi] = rams.at(i)->coord_f64();
-	  auto [xj,yj] = rams.at(j)->coord_f64();
-	  f64 dist = fabs(xi-xj) + fabs(yi-yj); // Manhattan distance (um)
-	  connect[index(i,j)].set(dist);
-	}
+        for (u64 j=0; j<rams.size(); j++) {
+          auto [xi,yi] = rams.at(i)->coord_f64();
+          auto [xj,yj] = rams.at(j)->coord_f64();
+          f64 dist = fabs(xi-xj) + fabs(yi-yj); // Manhattan distance (um)
+          connect[index(i,j)].set(dist);
+        }
       }
       default_region.enter();
     }
@@ -3652,7 +3652,7 @@ namespace hcm {
     {
       print(default_region,os);
     }
-    
+
   } panel;
 
 
@@ -3726,7 +3726,7 @@ namespace hcm {
     T sign_extended() const requires std::signed_integral<T>
     {
       if constexpr (N < bitwidth<T>) {
-	assert((std::make_unsigned_t<T>(data) >> N) == 0);
+        assert((std::make_unsigned_t<T>(data) >> N) == 0);
       }
       constexpr T signbit = T(1) << (N-1);
       return (data ^ signbit) - signbit;
@@ -3747,22 +3747,22 @@ namespace hcm {
     {
 #ifndef FREE_FANOUT
       if (read_credit!=0) {
-	read_credit--;
+        read_credit--;
       } else {
 #ifdef CHECK_FANOUT
-	if (read_credit == 0) {
-	  std::cerr<< "fanout exhausted" << std::endl;
-	  std::terminate();
-	}
+        if (read_credit == 0) {
+          std::cerr<< "fanout exhausted" << std::endl;
+          std::terminate();
+        }
 #else
-	// fanout exhausted: delay increases linearly with the number of reads
-	// delay increment is that of a FO2 inverter (wires not modeled, TODO?)	
-	constexpr circuit fo2inv = inv{}.make(2*INVCAP) * N; // N inverters in parallel
-	static_assert(N==0 || fo2inv.delay()!=0);
-	// if the value is captured by a lambda executed by execute_if,
-	// fanout costs energy regardless of the predicate
-	panel.update_logic(site(),fo2inv,actual);
-	set_time(time()+fo2inv.delay());
+        // fanout exhausted: delay increases linearly with the number of reads
+        // delay increment is that of a FO2 inverter (wires not modeled, TODO?)
+        constexpr circuit fo2inv = inv{}.make(2*INVCAP) * N; // N inverters in parallel
+        static_assert(N==0 || fo2inv.delay()!=0);
+        // if the value is captured by a lambda executed by execute_if,
+        // fanout costs energy regardless of the predicate
+        panel.update_logic(site(),fo2inv,actual);
+        set_time(time()+fo2inv.delay());
 #endif // CHECK_FANOUT
       }
 #endif // FREE_FANOUT
@@ -3772,9 +3772,9 @@ namespace hcm {
     {
       read();
       if constexpr (std::signed_integral<T>) {
-	return sign_extended();
+        return sign_extended();
       } else {
-	return data;
+        return data;
       }
     }
 
@@ -3782,9 +3782,9 @@ namespace hcm {
     {
       T old_data;
       if constexpr (std::signed_integral<T>) {
-	old_data = sign_extended();
+        old_data = sign_extended();
       } else {
-	old_data = data;
+        old_data = data;
       }
 #ifndef FREE_FANOUT
       data = 0; // destructive read (even if exec.active false)
@@ -3844,11 +3844,11 @@ namespace hcm {
       auto [v,t] = vt;
       auto l = site();
       return arr<val<W>,M> {
-	[&](){
-	  T vv = v;
-	  v >>= W;
-	  return val<W>{vv&mask,t,l};
-	}
+        [&](){
+          T vv = v;
+          v >>= W;
+          return val<W>{vv&mask,t,l};
+        }
       };
     }
 
@@ -3859,10 +3859,10 @@ namespace hcm {
       assert(k>=0);
       auto [v,t] = vt;
       if (k==0) {
-	return {v,t,site()};
+        return {v,t,site()};
       } else {
-	auto y = v<<k | v>>(N-k);
-	return {y,t,site()};
+        auto y = v<<k | v>>(N-k);
+        return {y,t,site()};
       }
     }
 
@@ -3896,7 +3896,7 @@ namespace hcm {
       auto l = site();
       t += c.delay();
       return arr<val<1>,outputs> {
-	[&](u64 i){return val<1>{i==v,t,l};}
+        [&](u64 i){return val<1>{i==v,t,l};}
       };
     }
 
@@ -3911,14 +3911,14 @@ namespace hcm {
 
     template<ramtype U, u64 K>
     void distribute(std::span<U,K> mem,
-		    const std::array<std::array<i64,4>,K> &send,
-		    u64 node,
-		    std::array<val,K> &out)
+                    const std::array<std::array<i64,4>,K> &send,
+                    u64 node,
+                    std::array<val,K> &out)
     {
       const auto &dst = send[node];
       u64 fo = (dst[0]>=0) + (dst[1]>=0) + (dst[2]>=0) + (dst[3]>=0);
       if (fo==0) {
-	return;
+        return;
       }
       switch (fo) {
       case 1: out[node].fanout(hard<2>{}); break;
@@ -3927,9 +3927,9 @@ namespace hcm {
       case 4: out[node].fanout(hard<5>{}); break;
       }
       for (u64 i=0; i<4; i++) {
-	if (dst[i]<0) continue;
-	out[dst[i]] = out[node].connect(mem[dst[i]]);
-	distribute(mem,send,dst[i],out);
+        if (dst[i]<0) continue;
+        out[dst[i]] = out[node].connect(mem[dst[i]]);
+        distribute(mem,send,dst[i],out);
       }
     }
 
@@ -3940,88 +3940,88 @@ namespace hcm {
       panel.check_floorplan();
 
       struct info {
-	u64 loc;  // original location
-	u64 ramid; // id of first RAM in the range
-	u64 entry; // closest RAM (range index)
-	std::array<std::array<i64,4>,K> send; // send matrix
+        u64 loc;  // original location
+        u64 ramid; // id of first RAM in the range
+        u64 entry; // closest RAM (range index)
+        std::array<std::array<i64,4>,K> send; // send matrix
       };
       static std::vector<info> memo;
 
       // memoized?
       auto it = std::find_if(memo.begin(),memo.end(),[&](const info &e){
-	return e.ramid == mem[0].ram_id() && e.loc == site();
+        return e.ramid == mem[0].ram_id() && e.loc == site();
       });
 
       if (it == memo.end()) {
-	// not memoized yet, calculate the info
-	auto coord = [&](u64 i){
-	  return mem[i].coord();
-	};
-	// make the grid
-	std::array<i64,K> left, right, down, up;
-	std::fill(left.begin(),left.end(),-1);
-	std::fill(right.begin(),right.end(),-1);
-	std::fill(down.begin(),down.end(),-1);
-	std::fill(up.begin(),up.end(),-1);
-	for (u64 i=0; i<K; i++) {
-	  auto [x,y] = coord(i);
-	  for (u64 j=i+1; j<K; j++)
-	    if (coord(j)[0] == x) {up[i] = j; down[j] = i; break;}
-	  for (u64 j=i+1; j<K; j++)
-	    if (coord(j)[1] == y) {right[i] = j; left[j] = i; break;}	
-	}
-	// the graph can be disconnected if some RAMs not in the array are identical to those in the array
-	// one extra link makes the graph connected (guaranteed by floorplanning algo)
-	if (right[0]<0 && coord(K-1)[0] != coord(0)[0]) {
-	  down[0] = K-1;
-	  up[K-1] = 0;
-	} else if (up[0]<0 && coord(K-1)[1] != coord(0)[1]) {
-	  left[0] = K-1;
-	  right[K-1] = 0;
-	}
+        // not memoized yet, calculate the info
+        auto coord = [&](u64 i){
+          return mem[i].coord();
+        };
+        // make the grid
+        std::array<i64,K> left, right, down, up;
+        std::fill(left.begin(),left.end(),-1);
+        std::fill(right.begin(),right.end(),-1);
+        std::fill(down.begin(),down.end(),-1);
+        std::fill(up.begin(),up.end(),-1);
+        for (u64 i=0; i<K; i++) {
+          auto [x,y] = coord(i);
+          for (u64 j=i+1; j<K; j++)
+            if (coord(j)[0] == x) {up[i] = j; down[j] = i; break;}
+          for (u64 j=i+1; j<K; j++)
+            if (coord(j)[1] == y) {right[i] = j; left[j] = i; break;}
+        }
+        // the graph can be disconnected if some RAMs not in the array are identical to those in the array
+        // one extra link makes the graph connected (guaranteed by floorplanning algo)
+        if (right[0]<0 && coord(K-1)[0] != coord(0)[0]) {
+          down[0] = K-1;
+          up[K-1] = 0;
+        } else if (up[0]<0 && coord(K-1)[1] != coord(0)[1]) {
+          left[0] = K-1;
+          right[K-1] = 0;
+        }
 
-	memo.emplace_back();
-	it = memo.end()-1;
-	it->loc = site();
-	it->ramid = mem[0].ram_id();   
-	auto closest = std::min_element(mem.begin(), mem.end(), [&](const U &r1, const U &r2) {
-	  return panel.connect_distance(site(),r1.ram_id()) < panel.connect_distance(site(),r2.ram_id());
-	});
-	it->entry = std::distance(mem.begin(),closest);
+        memo.emplace_back();
+        it = memo.end()-1;
+        it->loc = site();
+        it->ramid = mem[0].ram_id();
+        auto closest = std::min_element(mem.begin(), mem.end(), [&](const U &r1, const U &r2) {
+          return panel.connect_distance(site(),r1.ram_id()) < panel.connect_distance(site(),r2.ram_id());
+        });
+        it->entry = std::distance(mem.begin(),closest);
 
-	// make the send matrix (K x [L,R,D,U])
-	std::bitset<K> received;
-	received[it->entry] = true;
-	for (u64 i=0; i<K; i++)
-	  for (u64 j=0; j<4; j++)
-	    it->send[i][j] = -1;
-	for (u64 i=0; i<K; i++) {
-	  // mostly horizontal links
-	  if (coord(i)[0] < coord(it->entry)[0]) { // left side
-	    if (right[i] >= 0 && ! received[i]) {
-	      it->send[right[i]][0] = i;
-	      received[i] = true;
-	    }
-	  } else if (coord(i)[0] > coord(it->entry)[0]) { // right side
-	    if (left[i] >= 0 && ! received[i]) {
-	      it->send[left[i]][1] = i;
-	      received[i] = true;
-	    }
-	  }
-	  // vertical links for remaining nodes
-	  if (coord(i)[1] < coord(it->entry)[1]) { // bottom
-	    if (up[i] >= 0 && ! received[i]) {
-	      it->send[up[i]][2] = i;
-	      received[i] = true;
-	    }
-	  } else if (coord(i)[1] > coord(it->entry)[1]) { // top
-	    if (down[i] >= 0 && ! received[i]) {
-	      it->send[down[i]][3] = i;
-	      received[i] = true;
-	    }
-	  }
-	}
-	assert(received.all());
+        // make the send matrix (K x [L,R,D,U])
+        std::bitset<K> received;
+        received[it->entry] = true;
+        for (u64 i=0; i<K; i++)
+          for (u64 j=0; j<4; j++)
+            it->send[i][j] = -1;
+        for (u64 i=0; i<K; i++) {
+          // mostly horizontal links
+          if (coord(i)[0] < coord(it->entry)[0]) { // left side
+            if (right[i] >= 0 && ! received[i]) {
+              it->send[right[i]][0] = i;
+              received[i] = true;
+            }
+          } else if (coord(i)[0] > coord(it->entry)[0]) { // right side
+            if (left[i] >= 0 && ! received[i]) {
+              it->send[left[i]][1] = i;
+              received[i] = true;
+            }
+          }
+          // vertical links for remaining nodes
+          if (coord(i)[1] < coord(it->entry)[1]) { // bottom
+            if (up[i] >= 0 && ! received[i]) {
+              it->send[up[i]][2] = i;
+              received[i] = true;
+            }
+          } else if (coord(i)[1] > coord(it->entry)[1]) { // top
+            if (down[i] >= 0 && ! received[i]) {
+              it->send[down[i]][3] = i;
+              received[i] = true;
+            }
+          }
+        }
+        assert(received.all());
       }
 
       // output
@@ -4048,30 +4048,30 @@ namespace hcm {
 
     static constexpr T maxval = []() {
       if constexpr (N == bitwidth<T>) {
-	return std::numeric_limits<T>::max();
+        return std::numeric_limits<T>::max();
       } else {
-	static_assert(N < bitwidth<T>);
-	if constexpr (std::unsigned_integral<T>) {
-	  return (T(1)<<N)-1;
-	} else {
-	  static_assert(std::signed_integral<T>);
-	  return (T(1)<<(N-1))-1;
-	}
-      } 
+        static_assert(N < bitwidth<T>);
+        if constexpr (std::unsigned_integral<T>) {
+          return (T(1)<<N)-1;
+        } else {
+          static_assert(std::signed_integral<T>);
+          return (T(1)<<(N-1))-1;
+        }
+      }
     }();
 
     static constexpr T minval = []() {
       if constexpr (N == bitwidth<T>) {
-	return std::numeric_limits<T>::min();
+        return std::numeric_limits<T>::min();
       } else {
-	static_assert(N < bitwidth<T>);
-	if constexpr (std::unsigned_integral<T>) {
-	  return 0;
-	} else {
-	  static_assert(std::signed_integral<T>);
-	  return -(T(1)<<(N-1));
-	}
-      } 
+        static_assert(N < bitwidth<T>);
+        if constexpr (std::unsigned_integral<T>) {
+          return 0;
+        } else {
+          static_assert(std::signed_integral<T>);
+          return -(T(1)<<(N-1));
+        }
+      }
     }();
 
     val() {}
@@ -4109,12 +4109,12 @@ namespace hcm {
     void print(std::string before="", std::string after="\n", bool all=true, std::ostream & os=std::cout) const
     {
       if constexpr (std::signed_integral<T>) {
-	os << before << +sign_extended();
+        os << before << +sign_extended();
       } else {
-	os << before << +data;
+        os << before << +data;
       }
       if (all)
-	os << " (t=" << time() << " ps, loc=" << site() << ")";
+        os << " (t=" << time() << " ps, loc=" << site() << ")";
       os << after << std::flush;
     }
 
@@ -4122,14 +4122,14 @@ namespace hcm {
     {
       os << before;
       if constexpr (std::integral<T>) {
-	os << std::bitset<N>(data);
+        os << std::bitset<N>(data);
       } else if constexpr (std::same_as<T,f32>) {
-	os << std::bitset<N>(std::bit_cast<u32>(data));
+        os << std::bitset<N>(std::bit_cast<u32>(data));
       } else if constexpr (std::same_as<T,f64>) {
-	os << std::bitset<N>(std::bit_cast<u64>(data));
+        os << std::bitset<N>(std::bit_cast<u64>(data));
       }
       if (all)
-	os << " (t=" << time() << " ps, loc=" << site() << ")";
+        os << " (t=" << time() << " ps, loc=" << site() << ")";
       os << after << std::flush;
     }
 
@@ -4251,10 +4251,10 @@ namespace hcm {
     {
       static_assert(M!=0);
       return distribute(std::span(mem),std::move(*this).get_vt());
-    }    
+    }
   };
 
-  
+
   // ######################################################
 
   inline auto exec_control::to_val() const
@@ -4324,9 +4324,9 @@ namespace hcm {
       using rawtype = arraytype::value_type::type;
       std::array<rawtype,N> rawv;
       if constexpr (std::is_rvalue_reference_v<decltype(aov)>) {
-	for (u64 i=0; i<N; i++) rawv[i] = std::move(aov[i]).get();
+        for (u64 i=0; i<N; i++) rawv[i] = std::move(aov[i]).get();
       } else {
-	for (u64 i=0; i<N; i++) rawv[i] = aov[i].get();
+        for (u64 i=0; i<N; i++) rawv[i] = aov[i].get();
       }
       std::array<u64,N> vt;
       for (u64 i=0; i<N; i++) vt[i] = aov[i].time();
@@ -4342,9 +4342,9 @@ namespace hcm {
     static auto get_vtl(T && a)
     {
       if constexpr (std::is_rvalue_reference_v<decltype(a)>) {
-	return get_vtl(std::move(a.elem));
+        return get_vtl(std::move(a.elem));
       } else {
-	return get_vtl(a.elem);
+        return get_vtl(a.elem);
       }
     }
 
@@ -4363,16 +4363,16 @@ namespace hcm {
       template<valtype T>
       split_helper(T && x)
       {
-	constexpr u64 sum = (N1+...+Ni);
-	static_assert(valt<T>::size==sum,"sum of split sizes must match number of bits");
-	constexpr std::array N = {N1,Ni...};
-	auto [v,t] = std::forward<T>(x).get_vt();
-	u64 pos = sum;
-	static_loop<1+sizeof...(Ni)>([&]<u64 I>() {
-	    assert(pos>=N[I]);
-	    pos -= N[I];
-	    std::get<I>(tup) = {v>>pos,t,x.site()};
-	});
+        constexpr u64 sum = (N1+...+Ni);
+        static_assert(valt<T>::size==sum,"sum of split sizes must match number of bits");
+        constexpr std::array N = {N1,Ni...};
+        auto [v,t] = std::forward<T>(x).get_vt();
+        u64 pos = sum;
+        static_loop<1+sizeof...(Ni)>([&]<u64 I>() {
+            assert(pos>=N[I]);
+            pos -= N[I];
+            std::get<I>(tup) = {v>>pos,t,x.site()};
+          });
       }
     };
 
@@ -4388,7 +4388,7 @@ namespace hcm {
     friend val<1> operator== (T1&&, T2);
 
     template<valtype T1, hardval T2>
-    friend val<1> operator== (T1&&, T2);    
+    friend val<1> operator== (T1&&, T2);
 
     template<valtype T1, valtype T2>
     friend val<1> operator!= (T1&&, T2&&);
@@ -4410,7 +4410,7 @@ namespace hcm {
 
     template<valtype T1, valtype T2> requires (ival<T1> && ival<T2>)
     friend val<1> operator< (T1&&, T2&&);
-    
+
     template<valtype T1, std::integral T2> requires (ival<T1>)
     friend val<1> operator< (T1&&, T2);
 
@@ -4449,7 +4449,7 @@ namespace hcm {
 
     template<valtype T1, intlike T2> requires (ival<T1>)
     friend auto operator- (T1&&, T2);
-    
+
     template<intlike T1, valtype T2> requires (ival<T2>)
     friend auto operator- (T1, T2&&);
 
@@ -4460,7 +4460,7 @@ namespace hcm {
     friend valt<T1> operator>> (T1&&, T2);
 
     template<valtype T1, intlike T2> requires (std::signed_integral<base<T1>>)
-    friend valt<T1> operator>> (T1&&, T2);    
+    friend valt<T1> operator>> (T1&&, T2);
 
     template<valtype T1, valtype T2> requires (ival<T1> && ival<T2>)
     friend auto operator* (T1&&, T2&&);
@@ -4485,7 +4485,7 @@ namespace hcm {
 
     template<valtype T1, intlike T2>
     friend valt<T1> operator| (T1&&, T2);
-    
+
     template<valtype T1, valtype T2>
     friend valt<T1,T2> operator^ (T1&&, T2&&);
 
@@ -4514,7 +4514,7 @@ namespace hcm {
     friend void execute_if(T&&,const A&);
 
     template<valtype T, action A>
-    friend auto execute_if(T&&,const A&);  
+    friend auto execute_if(T&&,const A&);
   };
 
 
@@ -4529,12 +4529,12 @@ namespace hcm {
 
   private:
     u64 last_write_cycle = 0;
-    
+
     void create()
     {
       if (panel.storage_destroyed) {
-	std::cerr << "all storage (reg,ram) must have the same lifetime" << std::endl;
-	std::terminate();
+        std::cerr << "all storage (reg,ram) must have the same lifetime" << std::endl;
+        std::terminate();
       }
       val<N,T>::set_location(panel.register_location());
       panel.update_storage(N,false);
@@ -4562,7 +4562,7 @@ namespace hcm {
     reg(U &&x) : val<N,T>{std::forward<U>(x)}
     {
       create();
-    }    
+    }
 
     ~reg()
     {
@@ -4572,22 +4572,22 @@ namespace hcm {
     void assign_from(T v, u64 t, u64 loc)
     {
       if (panel.cycle <= last_write_cycle) {
-	std::cerr << "single register write per cycle" << std::endl;
-	std::terminate();
+        std::cerr << "single register write per cycle" << std::endl;
+        std::terminate();
       }
       if (! panel.arr_of_regs_ctor)
-	last_write_cycle = panel.cycle;
+        last_write_cycle = panel.cycle;
       t += panel.connect_delay(loc,val<N,T>::site(),val<N,T>::size);
       if (t < exec.time) {
-	// exec.time is not null,  we are inside an execute_if
-	val<N,T>::set_time(exec.time);
+        // exec.time is not null,  we are inside an execute_if
+        val<N,T>::set_time(exec.time);
       } else {
-	val<N,T>::set_time(t);
+        val<N,T>::set_time(t);
       }
       // location is fixed
       if (exec.active) {
-	val<N,T>::data = val<N,T>::fit(v);
-	panel.update_energy(val<N,T>::site(),stg::write_energy_fJ);
+        val<N,T>::data = val<N,T>::fit(v);
+        panel.update_energy(val<N,T>::site(),stg::write_energy_fJ);
       }
     }
 
@@ -4603,15 +4603,15 @@ namespace hcm {
     void operator= (U && x)
     {
       if constexpr (valtype<U>) {
-	if constexpr (std::is_rvalue_reference_v<decltype(x)>) {
-	  auto [vx,tx] = std::move(x).get_vt();
-	  assign_from(vx,tx,x.site());
-	} else {
-	  auto [vx,tx] = x.get_vt();
-	  assign_from(vx,tx,x.site());
-	}
+        if constexpr (std::is_rvalue_reference_v<decltype(x)>) {
+          auto [vx,tx] = std::move(x).get_vt();
+          assign_from(vx,tx,x.site());
+        } else {
+          auto [vx,tx] = x.get_vt();
+          assign_from(vx,tx,x.site());
+        }
       } else {
-	assign_from(x,0,val<N,T>::site());
+        assign_from(x,0,val<N,T>::site());
       }
     }
 
@@ -4645,9 +4645,9 @@ namespace hcm {
     {
       static_assert(std::remove_reference_t<U>::size==N,"destination and source array must have the same size");
       if constexpr (std::is_rvalue_reference_v<decltype(x)>) {
-	for (u64 i=0; i<N; i++) elem[i] = x.elem[i].fo1();
+        for (u64 i=0; i<N; i++) elem[i] = x.elem[i].fo1();
       } else {
-	for (u64 i=0; i<N; i++) elem[i] = x.elem[i];
+        for (u64 i=0; i<N; i++) elem[i] = x.elem[i];
       }
     }
 
@@ -4689,7 +4689,7 @@ namespace hcm {
       auto [v,t,l] = vtl;
       u64 y = 0;
       for (i64 i=N-1; i>=0; i--) {
-	y = (y<<T::size) | v[i];
+        y = (y<<T::size) | v[i];
       }
       return val<N*T::size> {y,t,l};
     }
@@ -4701,7 +4701,7 @@ namespace hcm {
       static_assert(N!=0);
       static_assert(W!=0 && W<=64);
       constexpr u64 NBITS = T::size*N;
-      constexpr u64 M = (NBITS+W-1)/W;      
+      constexpr u64 M = (NBITS+W-1)/W;
       auto [v,t,l] = vtl;
       auto a = pack_bits<T::size>(v);
       auto aa = unpack_bits<W>(a);
@@ -4720,14 +4720,14 @@ namespace hcm {
       auto [vx,tx] = std::forward<U>(x).get_vt();
       auto a = pack_bits<T::size>(v);
       if constexpr (valt<U>::size == 64) {
-	for (u64 i=a.size()-1; i!=0; i--) a[i] = a[i-1];
-	a[0] = vx;
+        for (u64 i=a.size()-1; i!=0; i--) a[i] = a[i-1];
+        a[0] = vx;
       } else {
-	static_assert(valt<U>::size<64);
-	for (u64 i=a.size()-1; i!=0; i--) {
-	  a[i] = (a[i] << x.size) | (a[i-1] >> (64-x.size));
-	}
-	a[0] = (a[0] << x.size) | (vx & ((u64(1)<<x.size)-1));
+        static_assert(valt<U>::size<64);
+        for (u64 i=a.size()-1; i!=0; i--) {
+          a[i] = (a[i] << x.size) | (a[i-1] >> (64-x.size));
+        }
+        a[0] = (a[0] << x.size) | (vx & ((u64(1)<<x.size)-1));
       }
       auto aa = unpack_bits<T::size>(a);
       static_assert(aa.size()>=N);
@@ -4745,14 +4745,14 @@ namespace hcm {
       auto [vx,tx] = std::forward<U>(x).get_vt();
       auto a = pack_bits<T::size>(v);
       if constexpr (valt<U>::size == 64) {
-	for (u64 i=0; i<a.size()-1; i++) a[i] = a[i+1];
-	a[a.size()-1] = 0;
+        for (u64 i=0; i<a.size()-1; i++) a[i] = a[i+1];
+        a[a.size()-1] = 0;
       } else {
-	static_assert(valt<U>::size<64);
-	for (u64 i=0; i<a.size()-1; i++) {
-	  a[i] = (a[i] >> x.size) | (a[i+1] << (64-x.size));
-	}
-	a[a.size()-1] >>= x.size;
+        static_assert(valt<U>::size<64);
+        for (u64 i=0; i<a.size()-1; i++) {
+          a[i] = (a[i] >> x.size) | (a[i+1] << (64-x.size));
+        }
+        a[a.size()-1] >>= x.size;
       }
       u64 shiftin = (x.size==64)? vx : vx & ((u64(1)<<x.size)-1);
       u64 k = T::size*N - x.size;
@@ -4760,7 +4760,7 @@ namespace hcm {
       u64 pos = k%64;
       a[j] |= shiftin << pos;
       if (pos+x.size > 64) {
-	a[j+1] = shiftin >> (64-pos);
+        a[j+1] = shiftin >> (64-pos);
       }
       auto aa = unpack_bits<T::size>(a);
       static_assert(aa.size()>=N);
@@ -4853,7 +4853,7 @@ namespace hcm {
     }
 
   public:
-    
+
     arr() {}
 
     arr(arr &x)
@@ -4868,7 +4868,7 @@ namespace hcm {
     {
       panel.arr_of_regs_ctor = true;
       for (u64 i=0; i<N; i++) {
-	elem[i] = f(i);
+        elem[i] = f(i);
       }
       panel.arr_of_regs_ctor = false;
     }
@@ -4877,7 +4877,7 @@ namespace hcm {
     {
       panel.arr_of_regs_ctor = true;
       for (u64 i=0; i<N; i++) {
-	elem[i] = f();
+        elem[i] = f();
       }
       panel.arr_of_regs_ctor = false;
     }
@@ -4888,9 +4888,9 @@ namespace hcm {
       static_assert(arraysize<U> == N,"array size mismatch");
       panel.arr_of_regs_ctor = true;
       if constexpr (std::is_rvalue_reference_v<decltype(a)>) {
-	for (u64 i=0; i<N; i++) elem[i] = std::move(a[i]);
+        for (u64 i=0; i<N; i++) elem[i] = std::move(a[i]);
       } else {
-	for (u64 i=0; i<N; i++) elem[i] = a[i];
+        for (u64 i=0; i<N; i++) elem[i] = a[i];
       }
       panel.arr_of_regs_ctor = false;
     }
@@ -4927,8 +4927,8 @@ namespace hcm {
     T& operator[] (u64 i)
     {
       if (i>=N) {
-	std::cerr << "array bound exceeded (" << i << ">=" << N << ")" << std::endl;
-	std::terminate();
+        std::cerr << "array bound exceeded (" << i << ">=" << N << ")" << std::endl;
+        std::terminate();
       }
       return elem[i];
     }
@@ -4941,22 +4941,22 @@ namespace hcm {
       static_assert(ival<U>,"index must be an integer");
       static_assert(N!=0);
       if constexpr (N>=2) {
-	static_assert(valt<U>::size<=std::bit_width(N-1),"array index has too many bits");
-	constexpr auto c = MUX<N,T::size>;
-	auto [i,ti] = std::forward<U>(index).get_vt();
-	if (i>=N) {
-	  std::cerr << "array bound exceeded (" << i << ">=" << N << ")" << std::endl;
-	  std::terminate();
-	}
-	// all array elements participate, even those that are not selected
-	auto [v,t,l] = proxy::get_vtl(elem); // lvalue
-	panel.update_logic(l,c[0]); // MUX select
-	panel.update_logic(l,c[1]); // MUX data	
-	t = std::max(t,ti+proxy::connect_delay(index,l)+c[0].delay()) + c[1].delay();
-	return {v[i],t,l};
+        static_assert(valt<U>::size<=std::bit_width(N-1),"array index has too many bits");
+        constexpr auto c = MUX<N,T::size>;
+        auto [i,ti] = std::forward<U>(index).get_vt();
+        if (i>=N) {
+          std::cerr << "array bound exceeded (" << i << ">=" << N << ")" << std::endl;
+          std::terminate();
+        }
+        // all array elements participate, even those that are not selected
+        auto [v,t,l] = proxy::get_vtl(elem); // lvalue
+        panel.update_logic(l,c[0]); // MUX select
+        panel.update_logic(l,c[1]); // MUX data
+        t = std::max(t,ti+proxy::connect_delay(index,l)+c[0].delay()) + c[1].delay();
+        return {v[i],t,l};
       } else {
-	static_assert(N==1);
-	return elem[0];
+        static_assert(N==1);
+        return elem[0];
       }
     }
 
@@ -4999,13 +4999,13 @@ namespace hcm {
     [[nodiscard]] auto append(U && x) & // lvalue
     {
       return arr<valt<T>,N+1> {
-	[&](u64 i) -> valt<T> {
-	  if (i==N) {
-	    return std::forward<U>(x);
-	  } else {
-	    return elem[i];
-	  }
-	}
+        [&](u64 i) -> valt<T> {
+          if (i==N) {
+            return std::forward<U>(x);
+          } else {
+            return elem[i];
+          }
+        }
       };
     }
 
@@ -5013,13 +5013,13 @@ namespace hcm {
     [[nodiscard]] auto append(U && x) && // rvalue
     {
       return arr<valt<T>,N+1> {
-	[&](u64 i) -> valt<T> {
-	  if (i==N) {
-	    return std::forward<U>(x);
-	  } else {
-	    return elem[i].fo1();
-	  }
-	}
+        [&](u64 i) -> valt<T> {
+          if (i==N) {
+            return std::forward<U>(x);
+          } else {
+            return elem[i].fo1();
+          }
+        }
       };
     }
 
@@ -5028,9 +5028,9 @@ namespace hcm {
     {
       static_assert(L<N,"truncate means making the array shorter");
       return arr<valt<T>,L> {
-	[&](u64 i) -> valt<T> {
-	  return elem[i];
-	}
+        [&](u64 i) -> valt<T> {
+          return elem[i];
+        }
       };
     }
 
@@ -5039,9 +5039,9 @@ namespace hcm {
     {
       static_assert(L<N,"truncate means making the array shorter");
       return arr<valt<T>,L> {
-	[&](u64 i) -> valt<T> {
-	  return elem[i].fo1();
-	}
+        [&](u64 i) -> valt<T> {
+          return elem[i].fo1();
+        }
       };
     }
 
@@ -5056,7 +5056,7 @@ namespace hcm {
     [[nodiscard]] auto make_array(val<W>&&) && // rvalue
     {
       // FIXME: this is not a reduction
-      return make_array<W>(proxy::get_vtl(std::move(elem)));      
+      return make_array<W>(proxy::get_vtl(std::move(elem)));
     }
 
     template<valtype U>
@@ -5090,154 +5090,154 @@ namespace hcm {
     [[nodiscard]] valt<T> fold_xor() & // lvalue
     {
       if constexpr (N>=2) {
-	return fold_xor(proxy::get_vtl(elem));
+        return fold_xor(proxy::get_vtl(elem));
       } else if constexpr (N==1) {
-	return elem[0];
+        return elem[0];
       } else {
-	return 0;
+        return 0;
       }
     }
 
     [[nodiscard]] valt<T> fold_xor() && // rvalue
     {
       if constexpr (N>=2) {
-	return fold_xor(proxy::get_vtl(std::move(elem)));
+        return fold_xor(proxy::get_vtl(std::move(elem)));
       } else if constexpr (N==1) {
-	return elem[0].fo1();
+        return elem[0].fo1();
       } else {
-	return 0;
+        return 0;
       }
     }
 
     [[nodiscard]] valt<T> fold_or() & // lvalue
     {
       if constexpr (N>=2) {
-	return fold_or(proxy::get_vtl(elem));
+        return fold_or(proxy::get_vtl(elem));
       } else if constexpr (N==1) {
-	return elem[0];
+        return elem[0];
       } else {
-	return 0;
+        return 0;
       }
     }
 
     [[nodiscard]] valt<T> fold_or() && // rvalue
     {
       if constexpr (N>=2) {
-	return fold_or(proxy::get_vtl(std::move(elem)));
+        return fold_or(proxy::get_vtl(std::move(elem)));
       } else if constexpr (N==1) {
-	return elem[0].fo1();
+        return elem[0].fo1();
       } else {
-	return 0;
+        return 0;
       }
     }
 
     [[nodiscard]] valt<T> fold_and() & // lvalue
     {
       if constexpr (N>=2) {
-	return fold_and(proxy::get_vtl(elem));
+        return fold_and(proxy::get_vtl(elem));
       } else if constexpr (N==1) {
-	return elem[0];
+        return elem[0];
       } else {
-	return 0;
+        return 0;
       }
     }
 
     [[nodiscard]] valt<T> fold_and() && // rvalue
     {
       if constexpr (N>=2) {
-	return fold_and(proxy::get_vtl(std::move(elem)));
+        return fold_and(proxy::get_vtl(std::move(elem)));
       } else if constexpr (N==1) {
-	return elem[0].fo1();
+        return elem[0].fo1();
       } else {
-	return 0;
+        return 0;
       }
     }
 
     [[nodiscard]] auto fold_add() & // lvalue
     {
       if constexpr (N>=2) {
-	return fold_add(proxy::get_vtl(elem));
+        return fold_add(proxy::get_vtl(elem));
       } else if constexpr (N==1) {
-	return valt<T>{elem[0]};
+        return valt<T>{elem[0]};
       } else {
-	return valt<T>{0};
+        return valt<T>{0};
       }
     }
 
     [[nodiscard]] auto fold_add() && // rvalue
     {
       if constexpr (N>=2) {
-	return fold_add(proxy::get_vtl(std::move(elem)));
+        return fold_add(proxy::get_vtl(std::move(elem)));
       } else if constexpr (N==1) {
-	return valt<T>{elem[0].fo1()};
+        return valt<T>{elem[0].fo1()};
       } else {
-	return valt<T>{0};
+        return valt<T>{0};
       }
     }
 
     [[nodiscard]] valt<T> fold_nor() & // lvalue
     {
       if constexpr (N>=2) {
-	return fold_nor(proxy::get_vtl(elem));
+        return fold_nor(proxy::get_vtl(elem));
       } else if constexpr (N==1) {
-	return ~elem[0];
+        return ~elem[0];
       } else {
-	return 0;
+        return 0;
       }
     }
 
     [[nodiscard]] valt<T> fold_nor() && // rvalue
     {
       if constexpr (N>=2) {
-	return fold_nor(proxy::get_vtl(std::move(elem)));
+        return fold_nor(proxy::get_vtl(std::move(elem)));
       } else if constexpr (N==1) {
-	return ~elem[0].fo1();
+        return ~elem[0].fo1();
       } else {
-	return 0;
+        return 0;
       }
     }
 
     [[nodiscard]] valt<T> fold_nand() & // lvalue
     {
       if constexpr (N>=2) {
-	return fold_nand(proxy::get_vtl(elem));
+        return fold_nand(proxy::get_vtl(elem));
       } else if constexpr (N==1) {
-	return ~elem[0];
+        return ~elem[0];
       } else {
-	return 0;
+        return 0;
       }
     }
 
     [[nodiscard]] valt<T> fold_nand() && // rvalue
     {
       if constexpr (N>=2) {
-	return fold_nand(proxy::get_vtl(std::move(elem)));
+        return fold_nand(proxy::get_vtl(std::move(elem)));
       } else if constexpr (N==1) {
-	return ~elem[0].fo1();
+        return ~elem[0].fo1();
       } else {
-	return 0;
+        return 0;
       }
     }
 
     [[nodiscard]] valt<T> fold_xnor() & // lvalue
     {
       if constexpr (N>=2) {
-	return fold_xnor(proxy::get_vtl(elem));
+        return fold_xnor(proxy::get_vtl(elem));
       } else if constexpr (N==1) {
-	return ~elem[0];
+        return ~elem[0];
       } else {
-	return 0;
+        return 0;
       }
     }
 
     [[nodiscard]] valt<T> fold_xnor() && // rvalue
     {
       if constexpr (N>=2) {
-	return fold_xnor(proxy::get_vtl(std::move(elem)));
+        return fold_xnor(proxy::get_vtl(std::move(elem)));
       } else if constexpr (N==1) {
-	return ~elem[0].fo1();
+        return ~elem[0].fo1();
       } else {
-	return 0;
+        return 0;
       }
     }
   };
@@ -5284,8 +5284,8 @@ namespace hcm {
 
       void commit(ram &mem) const
       {
-	assert(addr<N);
-	mem.data[addr] = dataval;
+        assert(addr<N);
+        mem.data[addr] = dataval;
       }
     };
 
@@ -5310,8 +5310,8 @@ namespace hcm {
     ram(std::string label="") : rect(panel.rams.size(),static_ram::WIDTH,static_ram::HEIGHT,label)
     {
       if (panel.storage_destroyed) {
-	std::cerr << "all storage (reg,ram) must have the same lifetime" << std::endl;
-	std::terminate();
+        std::cerr << "all storage (reg,ram) must have the same lifetime" << std::endl;
+        std::terminate();
       }
       //static_ram::print();
       panel.update_storage(static_ram::NBITS,true);
@@ -5326,9 +5326,9 @@ namespace hcm {
     {
       panel.storage_destroyed = true;
       while (! writes.empty()) {
-	writes[0].commit(*this);
-	std::pop_heap(writes.begin(),writes.end());
-	writes.pop_back();
+        writes[0].commit(*this);
+        std::pop_heap(writes.begin(),writes.end());
+        writes.pop_back();
       }
     }
 
@@ -5338,28 +5338,28 @@ namespace hcm {
       panel.check_floorplan();
       const u64 ramid = ram_id();
       if (panel.cycle <= last_write_cycle) {
-	std::cerr << "single RAM write per cycle" << std::endl;
-	std::terminate();
+        std::cerr << "single RAM write per cycle" << std::endl;
+        std::terminate();
       }
       last_write_cycle = panel.cycle;
       auto [va,ta,la] = proxy::get_vtl(std::forward<TYPEA>(address));
       if constexpr (valtype<TYPEA>) {
-	ta += panel.connect_delay(la,ramid,address.size);
+        ta += panel.connect_delay(la,ramid,address.size);
       }
       if (is_less(va,0) || is_greater_equal(va,N)) {
-	std::cerr << "out-of-bounds RAM write (N=" << N << "; addr=" << va << ")" << std::endl;
-	std::terminate();
+        std::cerr << "out-of-bounds RAM write (N=" << N << "; addr=" << va << ")" << std::endl;
+        std::terminate();
       }
       auto [vd,td,ld] = proxy::get_vtl(std::forward<TYPED>(dataval));
       if constexpr (valtype<TYPED>) {
-	td += panel.connect_delay(ld,ramid,dataval.size);
+        td += panel.connect_delay(ld,ramid,dataval.size);
       } else if constexpr (arrtype<TYPED>) {
-	td += panel.connect_delay(ld,ramid,dataval.nbits);
+        td += panel.connect_delay(ld,ramid,dataval.nbits);
       }
       if (exec.active) {
-	panel.update_energy(ramid,static_ram::EWRITE);
-	writes.push_back({u64(va),valuetype(vd),std::max(ta,td)});
-	std::push_heap(writes.begin(),writes.end());
+        panel.update_energy(ramid,static_ram::EWRITE);
+        writes.push_back({u64(va),valuetype(vd),std::max(ta,td)});
+        std::push_heap(writes.begin(),writes.end());
       }
     }
 
@@ -5369,26 +5369,26 @@ namespace hcm {
       panel.check_floorplan();
       const u64 ramid = ram_id();
       if (panel.cycle <= last_read_cycle) {
-	std::cerr << "single RAM read per cycle" << std::endl;
-	std::terminate();
+        std::cerr << "single RAM read per cycle" << std::endl;
+        std::terminate();
       }
       last_read_cycle = panel.cycle;
       if (exec.active) {
-	panel.update_energy(ramid,static_ram::EREAD);
+        panel.update_energy(ramid,static_ram::EREAD);
       }
       auto [va,ta,la] = proxy::get_vtl(std::forward<U>(address));
       if constexpr (valtype<U>) {
-	ta += panel.connect_delay(la,ramid,address.size);
-      } 
+        ta += panel.connect_delay(la,ramid,address.size);
+      }
       while (! writes.empty() && writes[0].t <= ta) {
-	writes[0].commit(*this);
-	std::pop_heap(writes.begin(),writes.end());
-	writes.pop_back();
+        writes[0].commit(*this);
+        std::pop_heap(writes.begin(),writes.end());
+        writes.pop_back();
       }
       u64 t = ta + myllround(static_ram::LATENCY); // time at which the read completes
       if (is_less(va,0) || is_greater_equal(va,N)) {
-	std::cerr << "out-of-bounds RAM read (N=" << N << "; addr=" << va << ")" << std::endl;
-	std::terminate();
+        std::cerr << "out-of-bounds RAM read (N=" << N << "; addr=" << va << ")" << std::endl;
+        std::terminate();
       }
       T readval = (exec.active)? T{data[va]} : T{};
       readval.set_time(t);
@@ -5424,8 +5424,8 @@ namespace hcm {
     constexpr rom_content(std::initializer_list<U> l)
     {
       if (l.size() != N) {
-	std::cerr << "the list size must match the ROM size" << std::endl;
-	std::terminate();
+        std::cerr << "the list size must match the ROM size" << std::endl;
+        std::terminate();
       }
       std::copy(l.begin(),l.end(),data.begin());
     }
@@ -5445,15 +5445,15 @@ namespace hcm {
     constexpr rom_content(unaryfunc<u64,T> auto f)
     {
       for (u64 i=0; i<N; i++) {
-	data[i] = f(i);
+        data[i] = f(i);
       }
     }
 
     auto operator[] (u64 i) const
     {
       if (i>=N) {
-	std::cerr << "out-of-bounds ROM read (" << i << ">=" << N << ")" << std::endl;
-	std::terminate();
+        std::cerr << "out-of-bounds ROM read (" << i << ">=" << N << ")" << std::endl;
+        std::terminate();
       }
       return data[i].to_ullong();
     }
@@ -5689,7 +5689,7 @@ namespace hcm {
   {
     return std::forward<T2>(x2) <= x1;
   }
-  
+
   // LESS THAN OR EQUAL
   template<valtype T1, valtype T2> requires (ival<T1> && ival<T2>)
   val<1> operator<= (T1 && x1, T2 && x2)
@@ -5753,9 +5753,9 @@ namespace hcm {
     constexpr circuit c = INC<valt<T1>::size>; // TODO: specialize more
     proxy::update_logic(l1,c);
     return proxy::make_val<rtype>(v1+x2, t1+c.delay(), l1);
-  }  
+  }
 
-  template<intlike T1, valtype T2> requires (ival<T2>) // 1st arg constant 
+  template<intlike T1, valtype T2> requires (ival<T2>) // 1st arg constant
   auto operator+ (T1 x1, T2 && x2)
   {
     return std::forward<T2>(x2) + x1;
@@ -5794,7 +5794,7 @@ namespace hcm {
     return proxy::make_val<rtype>(v1-x2, t1+c.delay(), l1);
   }
 
-  template<intlike T1, valtype T2> requires (ival<T2>) // 1st arg constant 
+  template<intlike T1, valtype T2> requires (ival<T2>) // 1st arg constant
   auto operator- (T1 x1, T2 && x2)
   {
     auto [v2,t2,l2] = proxy::get_vtl(std::forward<T2>(x2));
@@ -6024,8 +6024,8 @@ namespace hcm {
     u64 l = std::get<N+1>(tup);
     u64 x = 0;
     static_loop<N>([&]<u64 I>() {
-	x = (x<<si[I]) | std::get<I>(tup);
-    });
+        x = (x<<si[I]) | std::get<I>(tup);
+      });
     return proxy::make_val<val<SIZE>>(x,t,l);
   }
 
@@ -6075,10 +6075,10 @@ namespace hcm {
       // we execute the action even when the condition is false
       // (otherwise, this primitive could be used to leak any bit)
       if constexpr (std::invocable<A>) {
-	f();
+        f();
       } else {
-	static_assert(std::invocable<A,u64>);
-	f(i);
+        static_assert(std::invocable<A,u64>);
+        f(i);
       }
     }
     exec = prev_exec;
@@ -6108,10 +6108,10 @@ namespace hcm {
       // we execute the action even when the condition is false
       // (otherwise, this primitive could be used to leak any bit)
       if constexpr (std::invocable<A>) {
-	result[i] = f();
+        result[i] = f();
       } else {
-	static_assert(std::invocable<A,u64>);
-	result[i] = f(i);
+        static_assert(std::invocable<A,u64>);
+        result[i] = f(i);
       }
       result[i].set_time(std::max(result[i].time(),tm+buf.delay())+gate.delay());
       proxy::update_logic(result[i].site(),out);
@@ -6134,7 +6134,7 @@ namespace hcm {
   }
 
   // encode(x) takes a one-hot value and returns the index of the hot bit
-  // if the input is not a one-hot value, the result is meaningless 
+  // if the input is not a one-hot value, the result is meaningless
 
   template<u64 N>
   [[nodiscard]] auto encode(val<N> x)
@@ -6147,7 +6147,7 @@ namespace hcm {
   }
 
   // fold(x,op) takes an array x, a 2-input function op doing a binary associative operation
-  // and reduces the array to a single value 
+  // and reduces the array to a single value
 
   template<arith T, u64 W, u64 N>
   [[nodiscard]] val<W,T> fold(arr<val<W,T>,N> x, auto op)
@@ -6158,9 +6158,9 @@ namespace hcm {
     }
     arr<val<W,T>,(N+1)/2> y = [&] (u64 i) -> val<W,T> {
       if (2*i+1 < N) {
-	return op(x[2*i].fo1(),x[2*i+1].fo1());
+        return op(x[2*i].fo1(),x[2*i+1].fo1());
       } else {
-	return x[2*i].fo1();
+        return x[2*i].fo1();
       }
     };
     return fold(y.fo1(),op);
@@ -6184,9 +6184,9 @@ namespace hcm {
     x.fanout(hard<2>{});
     arr<val<W,T>,N> y = [&] (u64 i) -> val<W,T> {
       if (i >= step) {
-	return op(x[i],x[i-step]);
+        return op(x[i],x[i-step]);
       } else {
-	return x[i];
+        return x[i];
       }
     };
     if (step >= std::bit_floor(N-1)) {
@@ -6205,4 +6205,3 @@ namespace hcm {
 }
 
 #endif // HARCOM_H
-

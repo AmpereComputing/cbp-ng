@@ -30,6 +30,8 @@ for filename in os.listdir(directory):
         p1_latency = max(p1_latency,math.ceil(float(p1_lat)))
         p2_latency = max(p2_latency,math.ceil(float(p2_lat)))
 
+# print("P1 latency = {}".format(p1_latency))
+# print("P2 latency = {}".format(p2_latency))
 
 # calculate average IPC, CPI, EPI
 count = 0
@@ -63,14 +65,14 @@ for filename in os.listdir(directory):
         MPI = p2_mispredictions / instructions
 
         # total cycles when the misprediction penalty is null
-        # (latencies might be null with ahead pipelining)
+        # (predictor latency might be null with ahead pipelining)
         cycles = pred_cycles * max(1,p1_latency) + divergences * p2_latency
 
         # throughput in instructions predicted (P2) per cycle
         IPC = instructions / cycles
 
         # cycles lost per correct-path instruction because of mispredictions
-        CPI = MPI * (misprediction_penalty + p2_latency)
+        CPI = MPI * (misprediction_penalty + max(p1_latency,p2_latency))
 
         #print(f"{name},{IPC:.6f},{CPI:.6f},{EPI}")
 
