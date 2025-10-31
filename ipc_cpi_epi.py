@@ -58,7 +58,7 @@ for filename in os.listdir(directory):
         divergences = float(diverge)
         p2_mispredictions = float(misp)
 
-        # dynamic energy per instrucion
+        # dynamic energy per instruction
         EPI = float(epi)
 
         # mispredictions per instruction
@@ -66,13 +66,17 @@ for filename in os.listdir(directory):
 
         # total cycles when the misprediction penalty is null
         # (predictor latency might be null with ahead pipelining)
-        cycles = pred_cycles * max(1,p1_latency) + divergences * p2_latency
+        if p2_latency <= p1_latency:
+            # ignore P1, P2 is sufficient
+            cycles = pred_cycles * max(1,p2_latency)
+        else:
+            cycles = pred_cycles * max(1,p1_latency) + divergences * p2_latency
 
         # throughput in instructions predicted (P2) per cycle
         IPC = instructions / cycles
 
         # cycles lost per correct-path instruction because of mispredictions
-        CPI = MPI * (misprediction_penalty + max(p1_latency,p2_latency))
+        CPI = MPI * (misprediction_penalty + p2_latency)
 
         #print(f"{name},{IPC:.6f},{CPI:.6f},{EPI}")
 
