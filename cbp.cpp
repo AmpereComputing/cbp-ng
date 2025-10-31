@@ -8,7 +8,7 @@ branch_predictor pred;
 int main(int argc, char * argv[])
 {
     if (argc != 5) {
-        printf("Expected three arguments: the instruction stream, warmup instructions, and measurement instructions\n");
+        printf("Expected four arguments: the instruction stream, the trace name, warmup instructions, and measurement instructions\n");
         return -1;
     }
     trace_reader reader(argv[1], argv[2]);
