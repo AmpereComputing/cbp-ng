@@ -45,6 +45,7 @@
 #include <exception>
 #include <span>
 #include <fstream>
+#include <numbers>
 
 
 class harcom_superuser; // has access to private members of class "val"
@@ -4524,6 +4525,7 @@ namespace hcm {
   class reg : public val<N,T> {
     template<u64,arith> friend class val;
     friend class proxy;
+    friend class ::harcom_superuser;
   public:
     using stg = flipflops<N>;
 
@@ -5273,6 +5275,7 @@ namespace hcm {
     std::array<valuetype,N> data {};
     u64 last_read_cycle = 0;
     u64 last_write_cycle = 0;
+    u64 last_access_cycle = 0;
     rectangle rect;
 
     struct writeop {
@@ -5341,6 +5344,8 @@ namespace hcm {
         std::cerr << "single RAM write per cycle" << std::endl;
         std::terminate();
       }
+      // counts as a write even if execution is gated by execute_if
+      // (otherwise this would allow free MUXing at the address and data ports)
       last_write_cycle = panel.cycle;
       auto [va,ta,la] = proxy::get_vtl(std::forward<TYPEA>(address));
       if constexpr (valtype<TYPEA>) {
@@ -5357,6 +5362,13 @@ namespace hcm {
         td += panel.connect_delay(ld,ramid,dataval.nbits);
       }
       if (exec.active) {
+#ifdef SINGLE_RAM_ACCESS
+        if (panel.cycle <= last_access_cycle) {
+          std::cerr << "single RAM access per cycle" << std::endl;
+          std::terminate();
+        }
+#endif
+        last_access_cycle = panel.cycle;
         panel.update_energy(ramid,static_ram::EWRITE);
         writes.push_back({u64(va),valuetype(vd),std::max(ta,td)});
         std::push_heap(writes.begin(),writes.end());
@@ -5372,8 +5384,17 @@ namespace hcm {
         std::cerr << "single RAM read per cycle" << std::endl;
         std::terminate();
       }
+      // counts as a read even if execution is gated by execute_if
+      // (otherwise this would allow free MUXing at the address port and free DEMUXing at the data port)
       last_read_cycle = panel.cycle;
       if (exec.active) {
+#ifdef SINGLE_RAM_ACCESS
+        if (panel.cycle <= last_access_cycle) {
+          std::cerr << "single RAM access per cycle" << std::endl;
+          std::terminate();
+        }
+#endif
+        last_access_cycle = panel.cycle;
         panel.update_energy(ramid,static_ram::EREAD);
       }
       auto [va,ta,la] = proxy::get_vtl(std::forward<U>(address));

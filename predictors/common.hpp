@@ -17,6 +17,85 @@ template<u64 N, typename T>
 }
 
 
+// banked RAM for doing (almost) 1 read-modify-write per cycle
+template<u64 N, u64 M, u64 B>
+struct rwram {
+    // M entries of N bits (total), B banks
+    static_assert(std::has_single_bit(M)); // number of entries is power of two
+    static constexpr u64 A = std::bit_width(M-1); // address bits
+    static_assert(B>=2 && B<=64);
+    static_assert(std::has_single_bit(B)); // number of banks is power of two
+    static constexpr u64 E = M/B; // entries per bank
+    static_assert(E>1);
+    static constexpr u64 L = std::bit_width(E-1); // local address bits
+    static constexpr u64 I = std::bit_width(B-1); // bank ID bits
+    static_assert(A==L+I);
+
+    ram<val<N>,E> bank[B];
+    reg<B> read_bank;
+
+    // buffered write
+    reg<B> write_bank;
+    reg<L> write_localaddr;
+    reg<N> write_data;
+
+    rwram(const char *label="") : bank{label} {}
+
+    val<N> read(val<A> addr)
+    {
+        auto [localaddr,bankid] = split<L,I>(addr.fo1());
+        localaddr.fanout(hard<B>{});
+        arr<val<1>,B> banksel = bankid.fo1().decode();
+        banksel.fanout(hard<2>{});
+        arr<val<N>,B> data = [&] (u64 i) -> val<N> {
+            return execute_if(banksel[i],[&](){return bank[i].read(localaddr);});
+        };
+        read_bank = banksel.concat();
+        return data.fo1().fold_or();
+    }
+
+    void write(val<A> addr, val<N> data, val<1> noconflict)
+    {
+        // if noconflict is set, there was no read in this cycle: we do the write immediately;
+        // we do the buffered write if no conflict with the read or the current write
+        auto [localaddr,bankid] = split<L,I>(addr.fo1());
+        data.fanout(hard<B+1>{});
+        noconflict.fanout(hard<B+2>{});
+        val<B> banksel = bankid.fo1().decode().concat();
+        banksel.fanout(hard<2>{});
+        val<B> noconflict_mask = noconflict.replicate(hard<B>{}).concat();
+        noconflict_mask.fanout(hard<2>{});
+        val<B> current_write = banksel & noconflict_mask;
+        current_write.fanout(hard<3>{});
+        arr<val<1>,B> current_write_split = current_write.make_array(val<1>{});
+        current_write_split.fanout(hard<2>{});
+        execute_if(current_write | (write_bank & ~read_bank), [&](u64 i){
+            val<L> a = select(current_write_split[i],localaddr,write_localaddr);
+            val<N> d = select(current_write_split[i],data,write_data);
+            bank[i].write(a.fo1(),d.fo1());
+        });
+        // buffer the current write if not done
+        // keep the previous write if not done and the current write is done
+        // otherwise invalidate buffered write
+        val<1> buffered_done = (write_bank & (current_write | read_bank)) == hard<0>{};
+        execute_if(buffered_done.fo1() | ~noconflict, [&](){
+            write_bank = banksel & ~noconflict_mask;
+            execute_if(~noconflict,[&](){
+                write_localaddr = localaddr;
+                write_data = data;
+            });
+        });
+    }
+
+    void reset()
+    {
+        for (u64 i=0; i<B; i++) {
+            bank[i].reset();
+        }
+    }
+};
+
+
 // global history updated by shifting left by one bit and then xoring with some branch bits
 // (branch direction, PC bits, target bits, whatever...)
 // N is the history length in bits

@@ -47,7 +47,7 @@ static constexpr uint64_t cycle_ps = 300;
  * branch and its direction.
  */
 
-typedef std::function<void(val<1>)> reuse_callback;
+using callback =  std::function<void(val<1>)>;
 
 struct predictor {
     friend class harcom_superuser;
@@ -68,19 +68,27 @@ struct predictor {
         reuse_prediction_callback(reuse_next.fo1());
     }
 
+    void need_extra_cycle(val<1> yes) {
+        need_extra_cycle_callback(yes.fo1());
+    }
+
     virtual ~predictor() {}
+
 private:
-    reuse_callback reuse_prediction_callback;
+    callback need_extra_cycle_callback;
+    callback reuse_prediction_callback;
 };
 
 
 class harcom_superuser {
+    friend class predictor;
     uint64_t ninstr = 0;
     uint64_t nbranch = 0;
     uint64_t ncondbr = 0;
     uint64_t npred = 0; // number of prediction cycles on the correct path
     uint64_t mispredictions = 0;
     uint64_t p1_p2_disagreements = 0;
+    uint64_t extra_cycles = 0;
     double warmup_energy_fJ = 0;
 
     uint64_t time = 0; // for measuring predictor latencies
@@ -91,14 +99,22 @@ class harcom_superuser {
 
     auto next_instruction()
     {
-        auto instruction = reader.next_instruction();
+        // traces have discontinuities in their control without any branch;
+        // we must correct taken_branch and next_pc;
+        // treat discontinuities as if they are unconditional branches
+        static instruction instr;
+        static instruction next_instr;
+        instr = next_instr;
+        next_instr = reader.next_instruction();
         ninstr++;
-        if (instruction.branch) {
+        if (instr.branch) {
             nbranch++;
-            if (instruction.inst_class == INST_CLASS::BR_COND)
+            if (instr.inst_class == INST_CLASS::BR_COND)
                 ncondbr++;
         }
-        return instruction;
+        instr.next_pc = next_instr.pc;
+        instr.taken_branch = (next_instr.pc != instr.pc+4);
+        return instr;
     }
 
     void clear_stats()
@@ -108,6 +124,7 @@ class harcom_superuser {
         npred = 0;
         mispredictions = 0;
         p1_p2_disagreements = 0;
+        extra_cycles = 0;
         warmup_energy_fJ = panel.energy_fJ();
     }
 
@@ -127,10 +144,19 @@ public:
         // within the predictors, so we query and store its value below rather
         // than rely upon it to remain constant
         bool reuse_prediction = false;
-        reuse_callback rcb = [&reuse_prediction](val<1> reuse_me) {
+        callback rcb = [&reuse_prediction](val<1> reuse_me) {
             reuse_prediction = reuse_me.fo1().get();
         };
         p.reuse_prediction_callback = rcb;
+
+        p.need_extra_cycle_callback = [&](val<1> yes) {
+            // ignore timing of value "yes" (FIXME?)
+            if (yes.fo1().get()) {
+                panel.next_cycle();
+                time += cycle_ps;
+                extra_cycles++;
+            }
+        };
 
         try {
             while (ninstr < total_instructions) {
@@ -182,6 +208,7 @@ public:
                 //   @ level 2 misprediction;
                 //   @ the predictor asks to stop here.
                 if (instruction.taken_branch || p2_misprediction || !reuse_next_prediction) {
+                    // end of block
                     p.update_cycle({p2_misprediction,time},{instruction.next_pc,time});
                     panel.next_cycle();
                     time += cycle_ps;
@@ -210,6 +237,7 @@ public:
         std::cout << "," << nbranch;
         std::cout << "," << ncondbr;
         std::cout << "," << npred;
+        std::cout << "," << extra_cycles;
         std::cout << "," << p1_p2_disagreements;
         std::cout << "," << mispredictions;
         std::cout << "," << p1_latency_cycles;

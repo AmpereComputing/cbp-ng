@@ -1,4 +1,5 @@
 // this is a basic TAGE, not necessarily well optimized
+
 #define USE_META
 #define RESET_UBITS
 
@@ -13,10 +14,7 @@ struct tage : predictor {
     // P2 is a TAGE, P1 is a gshare
     static_assert(LOGLB>2);
     static_assert(NUMG>0);
-    static constexpr u64 CTR = 3;
     static constexpr u64 MINHIST = 2;
-    static constexpr u64 WEAK1 = 1<<(CTR-1);
-    static constexpr u64 WEAK0 = WEAK1-1;
     static constexpr u64 METABITS = 4;
     static constexpr u64 UCTRBITS = 8;
     static constexpr u64 PATHBITS = 6;
@@ -28,7 +26,7 @@ struct tage : predictor {
     static_assert(LOGP1 > LOGLINEINST);
     static_assert(LOGB > LOGLINEINST);
     static constexpr u64 index1_bits = LOGP1-LOGLINEINST;
-    static constexpr u64 bindex2_bits = LOGB-LOGLINEINST;
+    static constexpr u64 bindex_bits = LOGB-LOGLINEINST;
     static_assert(TAGW > LOGLINEINST); // the unhashed line offset is part of the tag
     static constexpr u64 HTAGBITS = TAGW-LOGLINEINST; // hashed tag bits
 
@@ -38,17 +36,18 @@ struct tage : predictor {
     // for P1
     reg<GHIST1> global_history1;
     reg<index1_bits> index1;
-    arr<reg<2>,LINEINST> readb1; // read P1 counters for each offset
+    arr<reg<1>,LINEINST> readp1; // prediction bits read from P1 table for each offset
     reg<LINEINST> p1; // P1 predictions
 
     // for P2
-    reg<bindex2_bits> bindex2; // bimodal table index
+    reg<bindex_bits> bindex; // bimodal table index
     arr<reg<LOGG>,NUMG> gindex; // global tables indexes
     arr<reg<HTAGBITS>,NUMG> htag; // computed hashed tags
 
-    arr<reg<2>,LINEINST> readb2; // read P2 bimodal counters for each offset
+    arr<reg<1>,LINEINST> readb; // read bimodal prediction bit for each offset
     arr<reg<TAGW>,NUMG> readt; // read tags
-    arr<reg<CTR>,NUMG> readc; // read global counters
+    arr<reg<1>,NUMG> readc; // read predictions
+    arr<reg<2>,NUMG> readh; // read hysteresis
     arr<reg<1>,NUMG> readu; // read u bits
     reg<NUMG> notumask; // read u bits, inverted
 
@@ -76,16 +75,19 @@ struct tage : predictor {
     arr<reg<1>,LINEINST> branch_dir;
     reg<LINEINST> block_entry; // one-hot vector
 
-    // P1 (bimodal)
-    ram<val<2>,(1<<index1_bits)> table1[LINEINST];
+    // P1 (gshare)
+    ram<val<1>,(1<<index1_bits)> table1_pred[LINEINST] {"P1 pred"}; // P1 prediction bit
 
     // P2 (TAGE)
-    ram<val<TAGW>,(1<<LOGG)> gtag[NUMG] {"TAGS"}; // global tables tags
-    ram<val<CTR>,(1<<LOGG)> gctr[NUMG] {"3-BIT CTRS"}; // global tables counters
-    ram<val<2>,(1<<bindex2_bits)> bim[LINEINST] {"2-BIT CTRS"}; // bimodal table
+    ram<val<TAGW>,(1<<LOGG)> gtag[NUMG] {"tags"}; // tags
+    ram<val<1>,(1<<LOGG)> gpred[NUMG] {"gpred"}; // predictions
+    rwram<2,(1<<LOGG),4> ghyst[NUMG] {"ghyst"}; // hysteresis
+    rwram<1,(1<<LOGG),4> ubit[NUMG] {"u"}; // "useful" bits
+    ram<val<1>,(1<<bindex_bits)> bim[LINEINST] {"bpred"}; // bimodal prediction bits
 
     zone UPDATE_ONLY;
-    ram<val<1>,(1<<LOGG)> ubit[NUMG] {"U BITS"}; // "useful" bits
+    ram<val<1>,(1<<index1_bits)> table1_hyst[LINEINST] {"P1 hyst"}; // P1 hysteresis
+    ram<val<1>,(1<<bindex_bits)> bhyst[LINEINST] {"bhyst"}; // bimodal hysteresis
 
     tage()
     {
@@ -120,10 +122,10 @@ struct tage : predictor {
         }
         index1.fanout(hard<LINEINST>{});
         for (u64 offset=0; offset<LINEINST; offset++) {
-            readb1[offset] = table1[offset].read(index1);
+            readp1[offset] = table1_pred[offset].read(index1);
         }
-        readb1.fanout(hard<2>{});
-        p1 = arr<val<1>,LINEINST>{[&](u64 offset){return readb1[offset]>>1;}}.concat();
+        readp1.fanout(hard<2>{});
+        p1 = readp1.concat();
         p1.fanout(hard<LINEINST>{});
         return (block_entry & p1) != hard<0>{};
     };
@@ -135,17 +137,17 @@ struct tage : predictor {
 
     val<1> predict2(val<64> inst_pc)
     {
-        val<std::max(bindex2_bits,LOGG)> lineaddr = inst_pc >> LOGLB;
+        val<std::max(bindex_bits,LOGG)> lineaddr = inst_pc >> LOGLB;
         lineaddr.fanout(hard<1+NUMG*2>{});
         gfolds.fanout(hard<2>{});
 
         // compute indexes
-        bindex2 = lineaddr;
-        bindex2.fanout(hard<LINEINST>{});
+        bindex = lineaddr;
+        bindex.fanout(hard<LINEINST>{});
         for (u64 i=0; i<NUMG; i++) {
             gindex[i] = lineaddr ^ gfolds.template get<0>(i);
         }
-        gindex.fanout(hard<3>{});
+        gindex.fanout(hard<4>{});
 
         // compute hashed tags
         for (u64 i=0; i<NUMG; i++) {
@@ -155,25 +157,26 @@ struct tage : predictor {
 
         // read tables
         for (u64 offset=0; offset<LINEINST; offset++) {
-            readb2[offset] = bim[offset].read(bindex2);
+            readb[offset] = bim[offset].read(bindex);
         }
-        readb2.fanout(hard<2>{});
+        readb.fanout(hard<2>{});
         for (u64 i=0; i<NUMG; i++) {
             readt[i] = gtag[i].read(gindex[i]);
-            readc[i] = gctr[i].read(gindex[i]);
+            readc[i] = gpred[i].read(gindex[i]);
+            readh[i] = ghyst[i].read(gindex[i]);
             readu[i] = ubit[i].read(gindex[i]);
         }
         readt.fanout(hard<LINEINST+1>{});
         readc.fanout(hard<3>{});
+        readh.fanout(hard<2>{});
         readu.fanout(hard<2>{});
         notumask = ~readu.concat();
         notumask.fanout(hard<2>{});
 
         // gather prediction bits for each offset
-        arr<val<1>,NUMG> gpreds_split = [&](int i) {return val<1>{readc[i]>>(CTR-1)};};
-        val<NUMG> gpreds = gpreds_split.fo1().concat();
+        val<NUMG> gpreds = readc.concat();
         gpreds.fanout(hard<LINEINST>{});
-        arr<val<NUMG+1>,LINEINST> preds = [&](u64 offset){return concat(val<1>{readb2[offset]>>1},gpreds);};
+        arr<val<NUMG+1>,LINEINST> preds = [&](u64 offset){return concat(readb[offset],gpreds);};
         preds.fanout(hard<2*LINEINST>{});
 
         // hashed tags comparisons
@@ -210,7 +213,7 @@ struct tage : predictor {
 
 #ifdef USE_META
         meta.fanout(hard<2>{});
-        arr<val<1>,NUMG> weakctr = [&](int i) {return (readc[i]==hard<WEAK0>{}) | (readc[i]==hard<WEAK1>{});};
+        arr<val<1>,NUMG> weakctr = [&](int i) {return readh[i]==hard<0>{};};
         val<NUMG> coldctr = notumask & weakctr.fo1().concat();
         coldctr.fanout(hard<LINEINST>{});
         val<1> metasign = (meta[METAPIPE-1] >= hard<0>{});
@@ -268,19 +271,18 @@ struct tage : predictor {
             });
             return; // stop here
         }
-        mispredict.fanout(hard<NUMG+1>{});
+        mispredict.fanout(hard<NUMG+2>{});
         val<1> correct_pred = ~mispredict;
         correct_pred.fanout(hard<NUMG+2>{});
-        index1.fanout(hard<LINEINST>{});
+        index1.fanout(hard<LINEINST*3>{});
         p2.fanout(hard<2>{});
-        bindex2.fanout(hard<LINEINST>{});
-        gindex.fanout(hard<3>{});
+        bindex.fanout(hard<LINEINST*3>{});
+        gindex.fanout(hard<4>{});
         htag.fanout(hard<3>{});
-        readb2.fanout(hard<2>{});
+        readb.fanout(hard<2>{});
         readt.fanout(hard<4>{});
         readc.fanout(hard<2>{});
-        notumask.fanout(hard<2>{});
-        match1.fanout(hard<2>{});
+        match1.fanout(hard<3>{});
         match2.fanout(hard<2>{});
         pred1.fanout(hard<2>{});
         pred2.fanout(hard<2+NUMG>{});
@@ -291,7 +293,7 @@ struct tage : predictor {
         meta.fanout(hard<2>{});
 #endif
         val<LOGLINEINST> last_offset = branch_offset[num_branch-1];
-        last_offset.fanout(hard<4*NUMG+1>{});
+        last_offset.fanout(hard<4*NUMG+2>{});
 
         u64 update_valid = (u64(1)<<num_branch)-1;
         arr<val<LINEINST>,LINEINST> update_mask = [&](u64 offset){
@@ -303,7 +305,10 @@ struct tage : predictor {
         arr<val<1>,LINEINST> is_branch = [&](u64 offset){
             return update_mask[offset] != hard<0>{};
         };
-        is_branch.fanout(hard<4>{});
+        is_branch.fanout(hard<5>{});
+
+        val<LINEINST> branch_mask = is_branch.concat();
+        branch_mask.fanout(hard<2>{});
 
         val<LINEINST> actualdirs = branch_dir.concat();
         actualdirs.fanout(hard<LINEINST>{});
@@ -311,17 +316,107 @@ struct tage : predictor {
         arr<val<1>,LINEINST> branch_taken = [&](u64 offset){
             return (actualdirs & update_mask[offset]) != hard<0>{};
         };
-        branch_taken.fanout(hard<2>{});
+        branch_taken.fanout(hard<3>{});
 
-        // Update P1 with the P2 prediction, not with the actual branch direction
-        auto p2_split = p2.make_array(val<1>{});
-        for (u64 offset=0; offset<LINEINST; offset++) {
-            execute_if(is_branch[offset], [&](){
-                table1[offset].write(index1,update_ctr(readb1[offset],p2_split[offset].fo1()));
+        arr<val<NUMG+1>,LINEINST> actual_match1 = [&] (u64 offset) {
+            return select(is_branch[offset],match1[offset],val<NUMG+1>{0});
+        };
+        actual_match1.fanout(hard<2>{});
+
+        val<NUMG> primary_mask = actual_match1.fold_or();
+        primary_mask.fanout(hard<3>{});
+
+        arr<val<1>,NUMG> primary = primary_mask.make_array(val<1>{});
+        primary.fanout(hard<2>{});
+
+        arr<val<1>,LINEINST> primary_wrong = [&](u64 offset){
+            return pred1[offset] != branch_taken[offset];
+        };
+        primary_wrong.fanout(hard<2>{});
+
+        // select some candidate entries for allocation
+        val<NUMG> mispmask = mispredict.replicate(hard<NUMG>{}).concat();
+        arr<val<1>,NUMG> last_tagcmp = [&](int i){return readt[i] == concat(last_offset,htag[i]);};
+        val<NUMG+1> last_match1 = last_tagcmp.fo1().append(1).concat().one_hot();
+        last_match1.fanout(hard<2>{});
+        val<NUMG> postmask = mispmask.fo1() & val<NUMG>(last_match1-1);
+        postmask.fanout(hard<2>{});
+        val<NUMG> candallocmask = postmask & notumask; // candidate post entries for allocation
+        candallocmask.fanout(hard<2>{});
+        // if multiple candidate entries, we select a single one, with some randomization
+        val<NUMG> collamask = candallocmask.reverse();
+        collamask.fanout(hard<2>{});
+        val<NUMG> collamask1 = collamask.one_hot();
+        collamask1.fanout(hard<3>{});
+        val<NUMG> collamask2 = (collamask^collamask1).one_hot();
+        val<NUMG> collamask12 = select(val<2>{std::rand()}==hard<0>{}, collamask2.fo1(), collamask1);
+        val<NUMG> allocmask = collamask12.fo1().reverse();
+        allocmask.fanout(hard<5>{});
+        arr<val<1>,NUMG> allocate = allocmask.make_array(val<1>{});
+        allocate.fanout(hard<5>{});
+
+        // associate a branch direction to each global table
+        arr<val<1>,NUMG> bdir = [&](u64 i) {
+            val<LOGLINEINST> tag_offset = readt[i] >> HTAGBITS;
+            val<LOGLINEINST> offset = select(allocate[i],last_offset,tag_offset.fo1());
+            offset.fanout(hard<LINEINST>{});
+            arr<val<1>,LINEINST> match_offset = [&](u64 j){return branch_offset[j] == offset;};
+            return (match_offset.fo1().concat() & update_valid & actualdirs) != hard<0>{};
+        };
+        bdir.fanout(hard<2>{});
+
+        // tell if global prediction is incorrect
+        arr<val<1>,NUMG> badpred1 = [&](u64 i){
+            return readc[i] != bdir[i];
+        };
+        badpred1.fanout(hard<3>{});
+
+        // associate to each global table a bit telling if local prediction differs from secondary prediction
+        arr<val<1>,NUMG> altdiffer = [&](u64 i){
+            val<LOGLINEINST> tag_offset = readt[i] >> HTAGBITS;
+            return readc[i] != pred2.select(tag_offset.fo1());
+        };
+
+        // associate to each global table a bit telling if prediction for owning branch is correct
+        arr<val<1>,NUMG> goodpred = [&](u64 i){
+            val<LOGLINEINST> tag_offset = readt[i] >> HTAGBITS;
+            return (tag_offset.fo1() != last_offset) | correct_pred;
+        };
+
+        // do P1 and P2 agree?
+        val<LINEINST> disagree_mask = (p1 ^ p2) & branch_mask;
+        disagree_mask.fanout(hard<2>{});
+        arr<val<1>,LINEINST> disagree = disagree_mask.make_array(val<1>{});
+        disagree.fanout(hard<2>{});
+
+        // read the P1 hysteresis if P1 and P2 disagree
+        arr<val<1>,LINEINST> p1_weak = [&] (u64 offset) -> val<1> {
+            // returns 1 iff disagreement and hysteresis is weak
+            return execute_if(disagree[offset], [&](){
+                return ~table1_hyst[offset].read(index1); // hyst=0 means weak
             });
-        }
+        };
 
-        // update P2 with the actual branch direction
+        // read the bimodal hysteresis if bimodal caused a misprediction
+        arr<val<1>,LINEINST> b_weak = [&] (u64 offset) -> val<1> {
+            // returns 1 iff cause of misprediction and hysteresis is weak
+            val<1> bim_primary = actual_match1[offset] >> NUMG;
+            return execute_if(bim_primary.fo1() & primary_wrong[offset], [&](){
+                return ~bhyst[offset].read(bindex); // hyst=0 means weak
+            });
+        };
+
+        // determine which primary global predictions are incorrect with a weak hysteresis
+        arr<val<1>,NUMG> g_weak = [&] (u64 i) -> val<1> {
+            // returns 1 iff incorrect primary prediction and hysteresis is weak
+            return primary[i] & badpred1[i] & (readh[i]==hard<0>{});
+        };
+
+        // need extra cycle for modifying prediction bits and for TAGE allocation
+        val<1> some_badpred1 = (primary_mask & badpred1.concat()) != hard<0>{};
+        val<1> extra_cycle = some_badpred1.fo1() | mispredict | (disagree_mask != hard<0>{});
+        extra_cycle.fanout(hard<NUMG*2+1>{});
+        need_extra_cycle(extra_cycle);
 
 #ifdef USE_META
         // update meta counter
@@ -343,86 +438,55 @@ struct tage : predictor {
         meta[0] = select(newmeta>meta_t::maxval, meta_t{meta_t::maxval}, select(newmeta<meta_t::minval, meta_t{meta_t::minval}, meta_t{newmeta}));
 #endif
 
-        // select some candidate entries for allocation
-        val<NUMG> mispmask = mispredict.replicate(hard<NUMG>{}).concat();
-        arr<val<1>,NUMG> last_tagcmp = [&](int i){return readt[i] == concat(last_offset,htag[i]);};
-        val<NUMG+1> last_match1 = last_tagcmp.fo1().append(1).concat().one_hot();
-        last_match1.fanout(hard<2>{});
-        val<NUMG> postmask = mispmask.fo1() & val<NUMG>(last_match1-1);
-        postmask.fanout(hard<2>{});
-        val<NUMG> candallocmask = postmask & notumask; // candidate post entries for allocation
-        candallocmask.fanout(hard<2>{});
-
-        // if multiple candidate entries, we select a single one, with some randomization
-        val<NUMG> collamask = candallocmask.reverse();
-        collamask.fanout(hard<2>{});
-        val<NUMG> collamask1 = collamask.one_hot();
-        collamask1.fanout(hard<3>{});
-        val<NUMG> collamask2 = (collamask^collamask1).one_hot();
-        val<NUMG> collamask12 = select(val<2>{std::rand()}==hard<0>{}, collamask2.fo1(), collamask1);
-        val<NUMG> allocmask = collamask12.fo1().reverse();
-        allocmask.fanout(hard<4>{});
-        arr<val<1>,NUMG> allocate = allocmask.make_array(val<1>{});
-        allocate.fanout(hard<3>{});
-
-        // update the bimodal counters that provided a primary prediction
-        for (u64 offset=0; offset<LINEINST; offset++) {
-            val<1> bim_primary = match1[offset] >> NUMG;
-            execute_if(is_branch[offset] & bim_primary.fo1(), [&](){
-                bim[offset].write(bindex2, update_ctr(readb2[offset],branch_taken[offset]));
-            });
-        }
-
-        // associate a branch direction to each global table
-        arr<val<1>,NUMG> bdir = [&](u64 i) {
-            val<LOGLINEINST> tag_offset = readt[i] >> HTAGBITS;
-            val<LOGLINEINST> offset = select(allocate[i],last_offset,tag_offset.fo1());
-            offset.fanout(hard<LINEINST>{});
-            arr<val<1>,LINEINST> match_offset = [&](u64 j){return branch_offset[j] == offset;};
-            return (match_offset.fo1().concat() & update_valid & actualdirs) != hard<0>{};
-        };
-        bdir.fanout(hard<2>{});
-
-        // update a global counter if it provided a primary prediction or is in the allocated entry
-        arr<val<NUMG+1>,LINEINST> actual_match1 = [&](u64 offset){
-            return select(is_branch[offset],match1[offset],val<NUMG+1>{0});
-        };
-        val<NUMG> primarymask = actual_match1.fo1().fold_or();
-        primarymask.fanout(hard<2>{});
-        execute_if(primarymask | allocmask, [&](u64 i){
-            val<CTR> ctrinit = select(bdir[i],val<CTR>{WEAK1},val<CTR>{WEAK0});
-            val<CTR> updated_ctr = select(allocate[i], ctrinit.fo1(), update_ctr(readc[i],bdir[i]));
-            gctr[i].write(gindex[i],updated_ctr.fo1());
-        });
-
-        // overwrite the tag in the allocated entry
+        // overwrite the tag in the allocated entry (mispredict)
         execute_if(allocmask, [&](u64 i){gtag[i].write(gindex[i],concat(last_offset,htag[i]));});
 
-        // what follows is for updating u bits
-
-        // associate to each global table a bit telling if local prediction differs from secondary prediction
-        arr<val<1>,NUMG> altdiffer = [&](u64 i){
-            val<1> thispred = readc[i] >> (CTR-1);
-            val<LOGLINEINST> tag_offset = readt[i] >> HTAGBITS;
-            return thispred.fo1() != pred2.select(tag_offset.fo1());
-        };
-
-        // associate to each global table a bit telling if prediction for this branch is correct
-        arr<val<1>,NUMG> goodpred = [&](u64 i){
-            val<LOGLINEINST> tag_offset = readt[i] >> HTAGBITS;
-            return (tag_offset.fo1() != last_offset) | correct_pred;
-        };
-
         // update the u bits
-        val<NUMG> umask = primarymask & altdiffer.fo1().concat(); // u bits update mask
+        val<NUMG> umask = primary_mask & altdiffer.fo1().concat(); // u bits update mask
         // if all post entries have the u bit set, reset their u bits
         val<1> noalloc = (candallocmask == hard<0>{});
         val<NUMG> uclearmask = postmask & noalloc.fo1().replicate(hard<NUMG>{}).concat();
         uclearmask.fanout(hard<2>{});
         arr<val<1>,NUMG> uclear = uclearmask.make_array(val<1>{});
         execute_if(umask.fo1() | allocmask | uclearmask, [&](u64 i) {
-            val<1> newu = select(allocate[i] | uclear[i].fo1(), val<1>{0}, goodpred[i].fo1());
-            ubit[i].write(gindex[i],newu.fo1());
+            val<1> newu = goodpred[i].fo1() & ~allocate[i] & ~uclear[i].fo1();
+            ubit[i].write(gindex[i],newu.fo1(),extra_cycle);
+        });
+
+        // update P1 prediction if P1 and P2 disagree and the hysteresis bit is weak
+        auto p2_split = p2.make_array(val<1>{});
+        execute_if(p1_weak.fo1().concat(), [&](u64 offset){
+            // update with the P2 prediction, not with the actual branch direction
+            table1_pred[offset].write(index1,p2_split[offset].fo1());
+        });
+        // update P1 hysteresis
+        execute_if(branch_mask,[&](u64 offset){
+            table1_hyst[offset].write(index1,~disagree[offset]);
+        });
+
+        // update incorrect bimodal prediction if primary provider and hysteresis is weak
+        execute_if(b_weak.fo1().concat(), [&](u64 offset){
+            bim[offset].write(bindex,branch_taken[offset]);
+        });
+        // update bimodal hysteresis if bimodal is primary provider
+        for (u64 offset=0; offset<LINEINST; offset++) {
+            val<1> bim_primary = match1[offset] >> NUMG;
+            execute_if(is_branch[offset] & bim_primary.fo1(), [&](){
+                bhyst[offset].write(bindex,~primary_wrong[offset]);
+            });
+        }
+
+        // update incorrect global prediction if primary provider and the hysteresis is weak;
+        // initialize global prediction in the allocated entry
+        execute_if(g_weak.fo1().concat() | allocmask, [&](u64 i){
+            gpred[i].write(gindex[i],bdir[i]);
+        });
+        // update global prediction hysteresis if primary provider or allocated entry
+        execute_if(primary_mask | allocmask, [&](u64 i){
+            // if allocated entry, set hysteresis to 0;
+            // otherwise, increment hysteresis if correct pred, decrement if incorrect
+            val<2> newhyst = select(allocate[i],val<2>{0},update_ctr(readh[i],~badpred1[i]));
+            ghyst[i].write(gindex[i],newhyst.fo1(),extra_cycle);
         });
 
 #ifdef RESET_UBITS

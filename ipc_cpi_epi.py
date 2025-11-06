@@ -24,7 +24,7 @@ for filename in os.listdir(directory):
         if not line:
             continue
 
-        name, instr, branch, condbr, npred, diverge, misp, p1_lat, p2_lat, epi = line.split(',')
+        name, instr, branch, condbr, npred, extra, diverge, misp, p1_lat, p2_lat, epi = line.split(',')
 
         # round latency to an integer number of clock cycles
         p1_latency = max(p1_latency,math.ceil(float(p1_lat)))
@@ -51,10 +51,11 @@ for filename in os.listdir(directory):
         if not line:
             continue
 
-        name, instr, branch, condbr, npred, diverge, misp, p1_lat, p2_lat, epi = line.split(',')
+        name, instr, branch, condbr, npred, extra, diverge, misp, p1_lat, p2_lat, epi = line.split(',')
 
         instructions = float(instr)
         pred_cycles = float(npred)
+        extra_cycles = float(extra)
         divergences = float(diverge)
         p2_mispredictions = float(misp)
 
@@ -71,6 +72,8 @@ for filename in os.listdir(directory):
             cycles = pred_cycles * max(1,p2_latency)
         else:
             cycles = pred_cycles * max(1,p1_latency) + divergences * p2_latency
+
+        cycles += extra_cycles
 
         # throughput in instructions predicted (P2) per cycle
         IPC = instructions / cycles
