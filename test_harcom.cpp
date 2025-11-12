@@ -4,8 +4,8 @@ using namespace hcm;
 
 
 #define EXEC(...)                               \
-    std::cout << #__VA_ARGS__ << std::endl;     \
-    __VA_ARGS__;
+  std::cout << #__VA_ARGS__ << std::endl;       \
+  __VA_ARGS__;
 
 
 class harcom_superuser {
@@ -167,7 +167,9 @@ int main()
   {
     EXEC(val<10> x=31);
     EXEC(M1.write(x,13));
+    hsu.next_cycle();
     EXEC(M2.write(x*hard<31>{},M1.read(x).replicate(hard<3>{})));
+    hsu.next_cycle();
     EXEC(M2.read(x*x).print("","\n",false));
     hsu.next_cycle();
     EXEC((M1.read(x)+M2.read(x*x)[1]).print());

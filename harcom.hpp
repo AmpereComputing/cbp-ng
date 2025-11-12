@@ -1,4 +1,5 @@
 // HARCOM: Hardware Complexity Model
+// URL: https://gitlab.inria.fr/pmichaud/harcom
 // Language: C++20
 
 // Copyright (c) 2025 INRIA
@@ -4455,13 +4456,13 @@ namespace hcm {
     friend auto operator- (T1, T2&&);
 
     template<valtype T1, intlike T2> requires (ival<T1>)
-    friend valt<T1> operator<< (T1&&, T2);
+    friend auto operator<< (T1&&, T2);
 
     template<valtype T1, intlike T2> requires (std::unsigned_integral<base<T1>>)
-    friend valt<T1> operator>> (T1&&, T2);
+    friend auto operator>> (T1&&, T2);
 
     template<valtype T1, intlike T2> requires (std::signed_integral<base<T1>>)
-    friend valt<T1> operator>> (T1&&, T2);
+    friend auto operator>> (T1&&, T2);
 
     template<valtype T1, valtype T2> requires (ival<T1> && ival<T2>)
     friend auto operator* (T1&&, T2&&);
@@ -4476,28 +4477,28 @@ namespace hcm {
     friend auto operator% (T1&&, T2);
 
     template<valtype T1, valtype T2>
-    friend valt<T1,T2> operator& (T1&&, T2&&);
+    friend auto operator& (T1&&, T2&&);
 
     template<valtype T1, intlike T2>
-    friend valt<T1> operator& (T1&&, T2);
+    friend auto operator& (T1&&, T2);
 
     template<valtype T1, valtype T2>
-    friend valt<T1,T2> operator| (T1&&, T2&&);
+    friend auto operator| (T1&&, T2&&);
 
     template<valtype T1, intlike T2>
-    friend valt<T1> operator| (T1&&, T2);
+    friend auto operator| (T1&&, T2);
 
     template<valtype T1, valtype T2>
-    friend valt<T1,T2> operator^ (T1&&, T2&&);
+    friend auto operator^ (T1&&, T2&&);
 
     template<valtype T1, std::integral T2>
-    friend valt<T1> operator^ (T1&&, T2);
+    friend auto operator^ (T1&&, T2);
 
     template<valtype T1, hardval T2>
-    friend valt<T1> operator^ (T1&&, T2);
+    friend auto operator^ (T1&&, T2);
 
     template<valtype T>
-    friend valt<T> operator~ (T&&);
+    friend auto operator~ (T&&);
 
     template<valtype TA, valtype TB, valtype TC> requires (ival<TA> && ival<TB> && ival<TC>)
     friend auto a_plus_bc(TA&&,TB&&,TC&&);
@@ -4509,7 +4510,7 @@ namespace hcm {
     friend auto split(T&&);
 
     template<valtype T, valtype T1, valtype T2>
-    friend valt<T1,T2> select(T&&, T1&&, T2&&);
+    friend auto select(T&&, T1&&, T2&&);
 
     template<valtype T, action A> requires (std::same_as<return_type<A>,void>)
     friend void execute_if(T&&,const A&);
@@ -5362,7 +5363,7 @@ namespace hcm {
         td += panel.connect_delay(ld,ramid,dataval.nbits);
       }
       if (exec.active) {
-#ifdef SINGLE_RAM_ACCESS
+#ifndef READ_WRITE_RAM
         if (panel.cycle <= last_access_cycle) {
           std::cerr << "single RAM access per cycle" << std::endl;
           std::terminate();
@@ -5388,7 +5389,7 @@ namespace hcm {
       // (otherwise this would allow free MUXing at the address port and free DEMUXing at the data port)
       last_read_cycle = panel.cycle;
       if (exec.active) {
-#ifdef SINGLE_RAM_ACCESS
+#ifndef READ_WRITE_RAM
         if (panel.cycle <= last_access_cycle) {
           std::cerr << "single RAM access per cycle" << std::endl;
           std::terminate();
@@ -5828,7 +5829,7 @@ namespace hcm {
 
   // LEFT SHIFT
   template<valtype T1, intlike T2> requires (ival<T1>) // 2nd arg constant
-  valt<T1> operator<< (T1 && x1, T2 x2)
+  auto operator<< (T1 && x1, T2 x2)
   {
     auto [v1,t1,l1] = proxy::get_vtl(std::forward<T1>(x1));
     return proxy::make_val<valt<T1>>(v1<<x2, t1, l1);
@@ -5836,14 +5837,14 @@ namespace hcm {
 
   // RIGHT SHIFT
   template<valtype T1, intlike T2> requires (std::unsigned_integral<base<T1>>) // 2nd arg constant
-  valt<T1> operator>> (T1 && x1, T2 x2)
+  auto operator>> (T1 && x1, T2 x2)
   {
     auto [v1,t1,l1] = proxy::get_vtl(std::forward<T1>(x1));
     return proxy::make_val<valt<T1>>(v1>>x2, t1, l1);
   }
 
   template<valtype T1, intlike T2> requires (std::signed_integral<base<T1>>) // 2nd arg constant
-  valt<T1> operator>> (T1 && x1, T2 x2)
+  auto operator>> (T1 && x1, T2 x2)
   {
     // the sign bit is replicated
     static_assert(hardval<T2>,"right shift of signed integer: shift amount must be a hard value");
@@ -5923,7 +5924,7 @@ namespace hcm {
 
   // BITWISE AND
   template<valtype T1, valtype T2>
-  valt<T1,T2> operator& (T1 && x1, T2 && x2)
+  auto operator& (T1 && x1, T2 && x2)
   {
     constexpr circuit c = AND<2> * std::min(valt<T1>::size,valt<T2>::size);
     auto [v1,v2,t,l] = proxy::get_vtl(std::forward<T1>(x1),std::forward<T2>(x2));
@@ -5932,7 +5933,7 @@ namespace hcm {
   }
 
   template<valtype T1, intlike T2> // second argument is constant
-  valt<T1> operator& (T1 && x1, T2 x2)
+  auto operator& (T1 && x1, T2 x2)
   {
     // no transistors
     auto [v1,t1,l1] = proxy::get_vtl(std::forward<T1>(x1));
@@ -5940,7 +5941,7 @@ namespace hcm {
   }
 
   template<intlike T1, valtype T2> // first argument is constant
-  valt<T2> operator& (T1 x1, T2 && x2)
+  auto operator& (T1 x1, T2 && x2)
   {
     // no transistors
     return std::forward<T2>(x2) & x1;
@@ -5948,7 +5949,7 @@ namespace hcm {
 
   // BITWISE OR
   template<valtype T1, valtype T2>
-  valt<T1,T2> operator| (T1 && x1, T2 && x2)
+  auto operator| (T1 && x1, T2 && x2)
   {
     constexpr circuit c = OR<2> * std::min(valt<T1>::size,valt<T2>::size);
     auto [v1,v2,t,l] = proxy::get_vtl(std::forward<T1>(x1),std::forward<T2>(x2));
@@ -5957,7 +5958,7 @@ namespace hcm {
   }
 
   template<valtype T1, intlike T2> // second argument is constant
-  valt<T1> operator| (T1 && x1, T2 x2)
+  auto operator| (T1 && x1, T2 x2)
   {
     // no transistors
     auto [v1,t1,l1] = proxy::get_vtl(std::forward<T1>(x1));
@@ -5965,7 +5966,7 @@ namespace hcm {
   }
 
   template<intlike T1, valtype T2> // first argument is constant
-  valt<T2> operator| (T1 x1, T2 && x2)
+  auto operator| (T1 x1, T2 && x2)
   {
     // no transistors
     return std::forward<T2>(x2) | x1;
@@ -5973,7 +5974,7 @@ namespace hcm {
 
   // BITWISE EXCLUSIVE OR
   template<valtype T1, valtype T2>
-  valt<T1,T2> operator^ (T1 && x1, T2 && x2)
+  auto operator^ (T1 && x1, T2 && x2)
   {
     constexpr circuit c = XOR<2> * std::min(valt<T1>::size,valt<T2>::size);
     auto [v1,v2,t,l] = proxy::get_vtl(std::forward<T1>(x1),std::forward<T2>(x2));
@@ -5982,7 +5983,7 @@ namespace hcm {
   }
 
   template<valtype T1, std::integral T2> // second argument is constant
-  valt<T1> operator^ (T1 && x1, T2 x2)
+  auto operator^ (T1 && x1, T2 x2)
   {
     const circuit c = INV * ones<valt<T1>::size>(x2); // not constexpr
     auto [v1,t1,l1] = proxy::get_vtl(std::forward<T1>(x1));
@@ -5991,7 +5992,7 @@ namespace hcm {
   }
 
   template<valtype T1, hardval T2> // second argument is hard constant
-  valt<T1> operator^ (T1 && x1, T2 x2)
+  auto operator^ (T1 && x1, T2 x2)
   {
     constexpr circuit c = INV * ones<valt<T1>::size>(x2.value);
     auto [v1,t1,l1] = proxy::get_vtl(std::forward<T1>(x1));
@@ -6000,14 +6001,14 @@ namespace hcm {
   }
 
   template<intlike T1, valtype T2> // first argument is constant
-  valt<T2> operator^ (T1 x1, T2 && x2)
+  auto operator^ (T1 x1, T2 && x2)
   {
     return std::forward<T2>(x2) ^ x1;
   }
 
   // BITWISE COMPLEMENT
   template<valtype T>
-  valt<T> operator~ (T && x)
+  auto operator~ (T && x)
   {
     constexpr circuit c = INV * valt<T>::size;
     auto [v,t,l] = proxy::get_vtl(std::forward<T>(x));
@@ -6059,7 +6060,7 @@ namespace hcm {
 
   // SELECT BETWEEN TWO VALUES
   template<valtype T, valtype T1, valtype T2>
-  [[nodiscard]] valt<T1,T2> select(T && cond, T1 && x1, T2 && x2)
+  [[nodiscard]] auto select(T && cond, T1 && x1, T2 && x2)
   {
     // this is NOT conditional execution: both sides are evaluated
     static_assert(valt<T>::size == 1,"the condition of a select is a single bit");

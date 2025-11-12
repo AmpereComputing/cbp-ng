@@ -1,5 +1,5 @@
 GCC: version 12 or later
-Clang: version 21 or later
+Clang: version 19 or later
 
 To compile the default predictor:
 ./compile cbp
