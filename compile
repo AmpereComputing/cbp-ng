@@ -12,7 +12,7 @@ fi
 
 COMPILE="g++ -std=c++20"
 OPT="-O3"
-FLAGS="-Wall -Wextra -pedantic -Wold-style-cast -Werror -Wno-deprecated-declarations"
+FLAGS="-Wall -Wextra -pedantic -Wold-style-cast -Werror -Wno-deprecated-declarations -Wno-mismatched-tags"
 
 set -x
 
