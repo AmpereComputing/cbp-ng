@@ -204,7 +204,7 @@ public:
 
                 // One block predicted per cycle.
                 // The predicted block ends in the following cases:
-                //   @ unconditional branch;
+                //   @ jump;
                 //   @ level 2 misprediction;
                 //   @ the predictor asks to stop here.
                 if (instruction.taken_branch || p2_misprediction || !reuse_next_prediction) {
