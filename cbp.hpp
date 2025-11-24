@@ -88,6 +88,7 @@ class harcom_superuser {
     uint64_t npred = 0; // number of prediction cycles on the correct path
     uint64_t mispredictions = 0;
     uint64_t p1_p2_disagreements = 0;
+    uint64_t p1_p2_disagreements_at_block_end = 0;
     uint64_t extra_cycles = 0;
     double warmup_energy_fJ = 0;
     bool warmed_up = false;
@@ -126,6 +127,7 @@ class harcom_superuser {
         npred = 0;
         mispredictions = 0;
         p1_p2_disagreements = 0;
+        p1_p2_disagreements_at_block_end = 0;
         extra_cycles = 0;
         warmup_energy_fJ = panel.energy_fJ();
     }
@@ -191,10 +193,14 @@ public:
                 bool p2_misprediction = conditional_branch && (prediction2 != instruction.taken_branch);
                 // FIXME: in reality, P1 predicts all instructions, not just branches
                 bool p1_p2_disagreement = conditional_branch && (prediction2 != prediction1);
+                bool end_of_block = instruction.taken_branch || p2_misprediction || !reuse_next_prediction;
                 if (p2_misprediction) {
                     mispredictions++;
                 } else if (p1_p2_disagreement) {
                     p1_p2_disagreements++;
+                    if (end_of_block) {
+                        p1_p2_disagreements_at_block_end++;
+                    }
                 }
 
                 // Update the predictor if this was a conditional branch
@@ -209,8 +215,7 @@ public:
                 //   @ jump;
                 //   @ level 2 misprediction;
                 //   @ the predictor asks to stop here.
-                if (instruction.taken_branch || p2_misprediction || !reuse_next_prediction) {
-                    // end of block
+                if (end_of_block) {
                     p.update_cycle({p2_misprediction,time},{instruction.next_pc,time});
                     panel.next_cycle();
                     time += cycle_ps;
@@ -247,6 +252,7 @@ public:
         std::cout << "," << npred;
         std::cout << "," << extra_cycles;
         std::cout << "," << p1_p2_disagreements;
+        std::cout << "," << p1_p2_disagreements_at_block_end;
         std::cout << "," << mispredictions;
         std::cout << "," << p1_latency_cycles;
         std::cout << "," << p2_latency_cycles;
