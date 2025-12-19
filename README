@@ -39,7 +39,7 @@ To compute the VFS score for any IPC, CPI, and EPI:
 Reference TAGE-SC-L predictor (no timing, no energy):
 
 To compile:
-g++ -o reference -O3 reference.cpp -lz
+g++ -std=c++20 -o reference -O3 reference.cpp -lz
 
 To run one trace:
 ./reference ./gcc_test_trace.gz test 1000000 40000000
