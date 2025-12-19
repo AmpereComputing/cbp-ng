@@ -28,6 +28,8 @@
 
 #include <vector>
 
+using uint = unsigned int;
+
 //To get the predictor storage budget on stderr  uncomment the next line
 #define PRINTSIZE
 
