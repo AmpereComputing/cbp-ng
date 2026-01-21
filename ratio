@@ -4,4 +4,4 @@ COL1=$1
 COL2=$2
 RESDIR="$3"
 
-cat $RESDIR/*.out | awk -v COL1=$COL1 -v COL2=$COL2 -F',' '{printf "%-12s %12s %12s %12.5f\n",$1,$COL1,$COL2,$COL2/$COL1}'
+cat $RESDIR/*.out | awk -v COL1=$COL1 -v COL2=$COL2 -F',' '{printf "%12s %12s %12.5f  %s\n",$COL1,$COL2,$COL2/$COL1,$1}'
