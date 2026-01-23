@@ -45,7 +45,7 @@ struct gshare : predictor {
     {
         val<LOGLINEINST> offset = inst_pc.fo1() >> 2;
         block_entry = offset.fo1().decode().concat();
-        block_entry.fanout(hard<LINEINST*2>{});
+        block_entry.fanout(hard<3*LINEINST>{});
         block_size = 1;
     }
 
@@ -113,9 +113,11 @@ struct gshare : predictor {
         // updates for all conditional branches in the predicted block
         if (num_branch == 0) {
             // no conditional branch in this block
-            execute_if(~true_block, [&](){
-                // previous block ended on a mispredicted not-taken branch
-                // we are still in the same line, this is the last chunk
+            val<1> line_end = block_entry >> (LINEINST-block_size);
+            // update global history if previous block ended on a mispredicted not-taken branch
+            // (we are still in the same line, this is the last chunk)
+            // or if the block ends before the line boundary (unconditional jump)
+            execute_if(~true_block | ~line_end.fo1(), [&](){
                 global_history = (global_history << 1) ^ val<GHIST2>{next_pc.fo1()>>2};
                 true_block = 1;
             });
@@ -195,7 +197,7 @@ struct gshare : predictor {
 
         // update the global history
         val<1> line_end = block_entry >> (LINEINST-block_size);
-        true_block = ~mispredict.fo1() | branch_dir[num_branch-1] | line_end.fo1();
+        true_block = ~mispredict | branch_dir[num_branch-1] | line_end.fo1();
         execute_if(true_block, [&](){
             global_history = (global_history << 1) ^ val<GHIST2>{next_pc.fo1()>>2};
         });

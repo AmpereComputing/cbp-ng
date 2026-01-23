@@ -6055,7 +6055,7 @@ namespace hcm {
   template<u64 N1, u64... Ni, valtype T>
   [[nodiscard]] auto split(T && x)
   {
-    return proxy::split_helper<N1,Ni...>(x).tup;
+    return proxy::split_helper<N1,Ni...>(std::forward<T>(x)).tup;
   }
 
   // SELECT BETWEEN TWO VALUES
