@@ -91,7 +91,7 @@ struct tage : predictor {
 
     tage()
     {
-#ifdef VERBOSE
+#ifdef TAGE_VERBOSE
         std::cerr << "TAGE history lengths: ";
         for (u64 i=0; i<NUMG; i++) std::cerr << gfolds.HLEN[i] << " ";
         std::cerr << std::endl;
@@ -512,12 +512,5 @@ struct tage : predictor {
         });
 
         num_branch = 0; // done
-    }
-
-    ~tage()
-    {
-#ifdef VERBOSE
-        panel.print(std::cerr);
-#endif
     }
 };

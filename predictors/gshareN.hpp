@@ -156,11 +156,4 @@ struct gshareN : predictor {
         });
         num_branch = 0;
     }
-
-    ~gshareN()
-    {
-#ifdef VERBOSE
-        panel.print(std::cerr);
-#endif
-    }
 };

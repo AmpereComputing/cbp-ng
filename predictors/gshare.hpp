@@ -204,11 +204,4 @@ struct gshare : predictor {
 
         num_branch = 0; // done
     }
-
-    ~gshare()
-    {
-#ifdef VERBOSE
-        panel.print(std::cerr);
-#endif
-    }
 };

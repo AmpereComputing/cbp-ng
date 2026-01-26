@@ -71,7 +71,12 @@ struct predictor {
         need_extra_cycle_callback(yes.fo1());
     }
 
-    virtual ~predictor() {}
+    virtual ~predictor()
+    {
+#ifdef VERBOSE
+        panel.print(std::cerr);
+#endif
+    }
 
 private:
     callback need_extra_cycle_callback;

@@ -129,11 +129,4 @@ struct bimodalN : predictor {
         num_branch = 0;
         bb_inst = 0;
     }
-
-    ~bimodalN()
-    {
-#ifdef VERBOSE
-        panel.print(std::cerr);
-#endif
-    }
 };

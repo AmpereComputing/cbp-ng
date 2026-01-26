@@ -3195,6 +3195,7 @@ namespace hcm {
       friend void execute_if(T&&,const A&);
     template<valtype T, action A> friend auto execute_if(T&&,const A&);
   private:
+    bool nested = false;
     bool active = true;
     u64 time = 0;
     u64 location = 0;
@@ -3203,6 +3204,7 @@ namespace hcm {
 
     void set_state(bool cond, u64 t=0, u64 l=0)
     {
+      nested = true;
       active = cond;
       time = t;
       location = l;
@@ -3708,6 +3710,8 @@ namespace hcm {
     friend class proxy;
     friend class exec_control;
     friend class ::harcom_superuser;
+    template<valtype U, action A> requires (std::same_as<return_type<A>,void>)
+      friend void execute_if(U&&,const A&);
     template<valtype U, action A> friend auto execute_if(U&&,const A&);
 
   private:
@@ -4261,6 +4265,7 @@ namespace hcm {
 
   inline auto exec_control::to_val() const
   {
+    assert(nested);
     return val<1>(active,time,location);
   }
 
@@ -6088,8 +6093,13 @@ namespace hcm {
     constexpr u64 N = valt<T>::size;
     auto prev_exec = exec;
     // nesting execute_ifs increases the predicate's delay
-    auto prev_cond = exec.to_val().replicate(hard<N>{}).concat();
-    auto cond_mask = prev_cond.fo1() & std::forward<T>(mask);
+    val<N> cond_mask;
+    if (exec.nested) {
+      auto prev_cond = exec.to_val().replicate(hard<N>{}).concat();
+      cond_mask = prev_cond.fo1() & std::forward<T>(mask);
+    } else {
+      cond_mask = std::forward<T>(mask);
+    }
     auto [vm,tm,lm] = proxy::get_vtl(cond_mask.fo1());
     for (u64 i=0; i<N; i++) {
       bool cond = (vm>>i) & 1;
@@ -6120,8 +6130,13 @@ namespace hcm {
     constexpr circuit out = buf + gate;
     auto prev_exec = exec;
     // nesting execute_ifs increases the predicate's delay
-    auto prev_cond = exec.to_val().replicate(hard<N>{}).concat();
-    auto cond_mask = prev_cond.fo1() & std::forward<T>(mask);
+    val<N> cond_mask;
+    if (exec.nested) {
+      auto prev_cond = exec.to_val().replicate(hard<N>{}).concat();
+      cond_mask = prev_cond.fo1() & std::forward<T>(mask);
+    } else {
+      cond_mask = std::forward<T>(mask);
+    }
     auto [vm,tm,lm] = proxy::get_vtl(cond_mask.fo1());
     arr<rtype,N> result;
     for (u64 i=0; i<N; i++) {

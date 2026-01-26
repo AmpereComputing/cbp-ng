@@ -181,11 +181,4 @@ struct bimodal : predictor {
 
         num_branch = 0; // done
     }
-
-    ~bimodal()
-    {
-#ifdef VERBOSE
-        panel.print(std::cerr);
-#endif
-    }
 };
