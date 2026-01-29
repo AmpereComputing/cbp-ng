@@ -161,7 +161,7 @@ public:
             // ignore timing of value "yes" (FIXME?)
             if (yes.fo1().get()) {
                 panel.next_cycle();
-                time += cycle_ps;
+                //time += cycle_ps;
                 extra_cycles++;
             }
         };
@@ -186,8 +186,15 @@ public:
 
                 auto [prediction1, p1_time] = p1_result.fo1().get_vt();
                 auto [prediction2, p2_time] = p2_result.fo1().get_vt();
+
+                uint64_t next_time = time;
                 if (p1_time > time) {
-                    max_p1_lat_ps = std::max(max_p1_lat_ps, p1_time-time);
+                    uint64_t p1_lat_ps = p1_time - time;
+                    max_p1_lat_ps = std::max(max_p1_lat_ps, p1_lat_ps);
+                    uint64_t p1_lat_cycles = (p1_lat_ps + cycle_ps-1) / cycle_ps;
+                    next_time += p1_lat_cycles * cycle_ps;
+                } else {
+                    next_time += cycle_ps;
                 }
                 if (p2_time > time) {
                     max_p2_lat_ps = std::max(max_p2_lat_ps, p2_time-time);
@@ -195,9 +202,9 @@ public:
 
                 // Update the predictor if this was a conditional branch
                 if (conditional_branch) {
-                    p.update_condbr({instruction.pc, time},
-                                    {instruction.taken_branch, time},
-                                    {instruction.next_pc, time});
+                    p.update_condbr({instruction.pc, next_time},
+                                    {instruction.taken_branch, next_time},
+                                    {instruction.next_pc, next_time});
                 }
 
                 bool reuse_next_prediction = reuse_prediction;
@@ -220,9 +227,9 @@ public:
                 //   @ level 2 misprediction;
                 //   @ the predictor asks to stop here.
                 if (end_of_block) {
-                    p.update_cycle({p2_misprediction,time},{instruction.next_pc,time});
+                    p.update_cycle({p2_misprediction,next_time},{instruction.next_pc,next_time});
                     panel.next_cycle();
-                    time += cycle_ps;
+                    time = next_time;
                     npred++;
                     // Override what the predictor said about re-using this prediction
                     // (in case it wanted to continue).

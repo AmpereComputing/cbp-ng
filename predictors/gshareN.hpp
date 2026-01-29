@@ -4,7 +4,7 @@
 using namespace hcm;
 
 
-template<u64 LOGG=16, u64 GHIST=9, u64 LOGN=2>
+template<u64 LOGG=15, u64 GHIST=8, u64 LOGN=2>
 struct gshareN : predictor {
     // gshare with 2^LOGG entries, single prediction level (no overriding)
     // global history of GHIST bits
@@ -26,8 +26,9 @@ struct gshareN : predictor {
     // 1st pred in bank X, 2nd pred in bank X^1, 3rd pred in bank X^2,...
     reg<LOGN> X;
     reg<index_bits> index; // same index for all banks
+    arr<reg<1>,N> unordered_pred; // read prediction bits, unordered
     arr<reg<1>,N> pred; // read prediction bits, ordered
-    ram<val<1>,(1<<index_bits)> ctr_hi[N]; // prediction bit
+    ram<arr<val<1>,N>,(1<<index_bits)> ctr_hi; // prediction bits
 
     // simulation artifacts, hardware cost not modeled accurately
     reg<1> true_block = 1;
@@ -43,27 +44,23 @@ struct gshareN : predictor {
     {
         // new block
         assert(num_branch==0);
-        inst_pc.fanout(hard<4>{});
         block_size = 1;
-        block_entry = val<LOGLINEINST>{inst_pc>>2}.decode().concat();
-        block_entry.fanout(hard<LINEINST>{});
-        val<std::max(index_bits,GHIST)> pc_bits = inst_pc >> (LOGN+2);
+        val<index_bits> pc_bits = inst_pc >> (LOGN+2);
         if constexpr (GHIST <= index_bits) {
             index = pc_bits.fo1() ^ (val<index_bits>{global_history}<<(index_bits-GHIST));
         } else {
             index = global_history.make_array(val<index_bits>{}).append(pc_bits.fo1()).fold_xor();
         }
-        index.fanout(hard<N>{});
-        arr<val<1>,N> unordered_pred = [&](u64 i){
-            return ctr_hi[i].read(index);
-        };
+        unordered_pred = ctr_hi.read(index);
         unordered_pred.fanout(hard<N>{});
         X = inst_pc >> 2;
         X.fanout(hard<N>{});
         for (u64 i=0; i<N; i++) {
             pred[i] = unordered_pred.select(X^i);
         }
-        pred.fanout(hard<LINEINST*4>{});
+        pred.fanout(hard<LINEINST*2>{});
+        block_entry = val<LOGLINEINST>{inst_pc>>2}.decode().concat();
+        block_entry.fanout(hard<LINEINST>{});
         reuse_prediction(~val<1>{block_entry>>(LINEINST-1)});
         return pred[num_branch];
     };
@@ -123,10 +120,6 @@ struct gshareN : predictor {
         arr<val<1>,N> access = [&](u64 i) -> val<1> {
             return (bank[i]>>num_branch) == hard<0>{};
         };
-        // align branch directions with corresponding banks
-        arr<val<1>,N> true_dir = [&](u64 i) -> val<1> {
-            return branch_dir.select(X^i);
-        };
         // determine bank corresponding to mispredicted branch
         val<N> misp_bank = execute_if(mispredict, [&]() -> val<N> {
             return bank[num_branch-1];
@@ -141,8 +134,11 @@ struct gshareN : predictor {
         // we need an extra cycle if there is a mispredict
         need_extra_cycle(mispredict);
         // update prediction if mispredict and the hysteresis bit is weak
-        execute_if(weak.fo1().concat(), [&](u64 i){
-            ctr_hi[i].write(index,true_dir[i].fo1());
+        execute_if(mispredict, [&](){
+            arr<val<1>,N> bundle = [&](u64 i){
+                return select(weak[i].fo1(),branch_dir[num_branch-1],unordered_pred[i]);
+            };
+            ctr_hi.write(index,bundle);
         });
         // update hysteresis
         execute_if(access.fo1().concat(), [&](u64 i){
