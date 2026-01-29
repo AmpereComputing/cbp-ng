@@ -161,7 +161,6 @@ public:
             // ignore timing of value "yes" (FIXME?)
             if (yes.fo1().get()) {
                 panel.next_cycle();
-                //time += cycle_ps;
                 extra_cycles++;
             }
         };
