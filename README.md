@@ -69,6 +69,82 @@ different logic for the first instruction in a given block (i.e. an initial
 array lookup) than it does for subsequent instructions, and to directly control
 the length of a block.
 
+Below you will find a flowchart describing logic the simulator will use to
+determine which if your predictor's methods are called, and when:
+
+```mermaid
+---
+title: CBP-NG Predictor Interface (part 1)
+---
+flowchart TB
+
+  subgraph first_inst[Instruction 1]
+    direction TB
+    entry(["BEGIN block prediction with first instruction"])
+    entry --> predict1 & predict2
+
+    subgraph first_inst_predict[predict]
+      predict1["predict1()"]
+      predict2["predict2()"]
+      predict1 ~~~ predict2
+    end
+    subgraph first_inst_update[branch update]
+      condbr{{"Is instruction conditional branch?"}}
+      update_condbr["update_condbr()"]
+      predict1 & predict2 --> condbr
+      condbr -->|yes| update_condbr
+    end
+
+    condbr -->|no| reuse_predict
+    update_condbr --> reuse_predict
+    reuse_predict{{"instruction a taken or mispredicted branch or reuse_prediction() not last called with 1?"}}
+
+    reuse_predict -->|no| second_instruction
+    reuse_predict -->|yes| update_cycle
+
+    subgraph block_update[block update]
+      update_cycle(["END block prediction, call update_cycle()"])
+    end
+
+    second_instruction([Predict second instruction in block])
+  end
+```
+
+```mermaid
+---
+title: CBP-NG Predictor Interface  (part 2)
+---
+flowchart TB
+  subgraph nth_inst[Instructions 2 to N]
+    direction TB
+    entry(["Predict second instruction in block"])
+    entry --> reuse_predict1 & reuse_predict2
+
+    subgraph nth_inst_predict[predict]
+      reuse_predict1["reuse_predict1()"]
+      reuse_predict2["reuse_predict2()"]
+      reuse_predict1 ~~~ reuse_predict2
+    end
+
+    subgraph nth_inst_update[branch update]
+      condbr_n{{"Is instruction conditional branch?"}}
+      update_condbr_n["update_condbr()"]
+      reuse_predict1 & reuse_predict2 --> condbr_n
+      condbr_n -->|yes| update_condbr_n
+    end
+    condbr_n -->|no| reuse_predict_n
+    update_condbr_n --> reuse_predict_n
+    reuse_predict_n{{"instruction a taken or mispredicted branch or reuse_prediction() not last called with 1?"}}
+
+    subgraph block_update_n[block update]
+      update_cycle_n(["END block prediction, call update_cycle()"])
+    end
+
+    reuse_predict_n -->|no| reuse_predict1 & reuse_predict2
+    reuse_predict_n -->|yes| update_cycle_n
+  end
+```
+
 ### Example Predictors
 
 Sometimes an example is worth much more than an explanation. To that end,
