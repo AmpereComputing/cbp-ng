@@ -3719,7 +3719,7 @@ namespace hcm {
     T data = 0;
     u64 timing = 0; // time (picoseconds)
     u64 location = 0; // location (RAM id)
-    u64 read_credit = 0;
+    i64 read_credit = 0;
     const bool actual = exec.active;
 
     T fit(T x) const requires std::integral<T>
@@ -3752,7 +3752,7 @@ namespace hcm {
     void read()
     {
 #ifndef FREE_FANOUT
-      if (read_credit!=0) {
+      if (read_credit>0) {
         read_credit--;
       } else {
 #ifdef CHECK_FANOUT
@@ -3761,6 +3761,10 @@ namespace hcm {
           std::terminate();
         }
 #else
+        if (read_credit < 0) {
+          std::cerr<< "misuse of fo1()" << std::endl;
+          std::terminate();
+        }
         // fanout exhausted: delay increases linearly with the number of reads
         // delay increment is that of a FO2 inverter (wires not modeled, TODO?)
         constexpr circuit fo2inv = inv{}.make(2*INVCAP) * N; // N inverters in parallel
@@ -3793,7 +3797,7 @@ namespace hcm {
         old_data = data;
       }
 #ifndef FREE_FANOUT
-      data = 0; // destructive read (even if exec.active false)
+      read_credit = -1; // no more reads allowed (even if exec.active false)
 #endif
       return old_data;
     }
@@ -4097,7 +4101,7 @@ namespace hcm {
     {
 #ifndef FREE_FANOUT
       static_assert(FO>=2);
-      if (FO < read_credit) return;
+      if (is_less(FO,read_credit)) return;
       // delay logarithmic with fanout
       panel.update_logic(site(),REP<N,FO>);
       set_time(time()+REP<N,FO>.delay());
@@ -4597,6 +4601,7 @@ namespace hcm {
         val<N,T>::data = val<N,T>::fit(v);
         panel.update_energy(val<N,T>::site(),stg::write_energy_fJ);
       }
+      val<N,T>::read_credit = 0;
     }
 
     void operator= (reg &x)
@@ -4624,7 +4629,6 @@ namespace hcm {
     }
 
     void set_location(u64) = delete; // register location cannot be modified
-    void fo1() = delete; // register value is persistent
   };
 
 
