@@ -43,6 +43,8 @@ The `predictor` interface your predictor must implement is specified in
 are code comments alongside the interface describing it, and a brief
 explanation of it also follows:
 
+![predictor interface flowchart](/docs/interface-flowchart.svg)
+
 There are two main 'levels' of branch prediction your predictor may implement -
 levels 1 and 2. This interface structure is intended to support prediction
 pipelining (for example, with a fast prediction providing throughput, but with
