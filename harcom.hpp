@@ -4048,7 +4048,14 @@ namespace hcm {
     using type = T;
 
 #ifdef CHEATING_MODE
-    operator T() {return data;}
+    operator T()
+    {
+      if constexpr (std::signed_integral<T>) {
+        return sign_extended();
+      } else {
+        return data;
+      }
+    }
 
     u64 time() const
     {
