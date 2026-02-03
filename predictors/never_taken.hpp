@@ -30,5 +30,5 @@ struct never_taken : predictor {
 
     void update_condbr([[maybe_unused]] val<64> branch_pc, [[maybe_unused]] val<1> taken, [[maybe_unused]] val<64> next_pc) { }
 
-    void update_cycle([[maybe_unused]] val<1> mispredict, [[maybe_unused]] val<64> next_pc) { }
+    void update_cycle([[maybe_unused]] instruction_info &block_end_info) { }
 };
