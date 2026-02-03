@@ -48,6 +48,19 @@ static constexpr uint64_t cycle_ps = 300;
 
 using callback =  std::function<void(val<1>)>;
 
+
+struct instruction_info {
+    val<1> is_branch;
+    val<1> is_taken;
+    val<1> is_conditional;
+    val<1> is_indirect;
+    val<1> is_call;
+    val<1> is_return;
+    val<1> is_mispredict;
+    val<64> next_pc;
+};
+
+
 struct predictor {
     friend class harcom_superuser;
     /*
@@ -61,7 +74,7 @@ struct predictor {
 
     virtual void update_condbr(val<64> branch_pc, val<1> taken, val<64> next_pc) = 0;
 
-    virtual void update_cycle(val<1> mispredict, val<64> next_pc) = 0;
+    virtual void update_cycle(instruction_info &block_end_info) = 0;
 
     void reuse_prediction(val<1> reuse_next) {
         reuse_prediction_callback(reuse_next.fo1());
@@ -105,21 +118,25 @@ class harcom_superuser {
 
     auto next_instruction()
     {
-        // traces have discontinuities in their control without any branch;
-        // we must correct taken_branch and next_pc;
-        // treat discontinuities as if they are unconditional branches
+        // traces have discontinuities not caused by branches;
+        // try to make the trace look consistent, to the extent possible.
         static instruction instr;
         static instruction next_instr;
         instr = next_instr;
         next_instr = reader.next_instruction();
         ninstr++;
+        instr.taken_branch = (next_instr.pc != instr.pc+4);
+        if (! instr.branch && instr.taken_branch) {
+            // discontinuity; make it look like an indirect jump
+            instr.branch = true;
+            instr.inst_class = INST_CLASS::BR_UNCOND_INDIRECT;
+        }
         if (instr.branch) {
             nbranch++;
             if (instr.inst_class == INST_CLASS::BR_COND)
                 ncondbr++;
         }
         instr.next_pc = next_instr.pc;
-        instr.taken_branch = (next_instr.pc != instr.pc+4);
         return instr;
     }
 
@@ -169,7 +186,6 @@ public:
             while (!warmed_up || ninstr < measurement_instructions) {
                 auto instruction = next_instruction();
                 bool conditional_branch = (instruction.inst_class == INST_CLASS::BR_COND);
-                //bool unconditional_branch = instruction.branch && !conditional_branch;
 
                 // First, make the first and second level predictions
                 val<1> p1_result;
@@ -226,7 +242,16 @@ public:
                 //   @ level 2 misprediction;
                 //   @ the predictor asks to stop here.
                 if (end_of_block) {
-                    p.update_cycle({p2_misprediction,next_time},{instruction.next_pc,next_time});
+                    instruction_info info;// {instruction, p2_misprediction, time};
+                    info.is_branch = {instruction.branch, next_time};
+                    info.is_taken = {instruction.taken_branch, next_time};
+                    info.is_conditional = {instruction.inst_class == INST_CLASS::BR_COND, next_time};
+                    info.is_indirect = {(instruction.inst_class == INST_CLASS::BR_UNCOND_INDIRECT) || (instruction.inst_class == INST_CLASS::BR_CALL_INDIRECT), next_time};
+                    info.is_call = {(instruction.inst_class == INST_CLASS::BR_CALL_DIRECT) || (instruction.inst_class == INST_CLASS::BR_CALL_INDIRECT), next_time};
+                    info.is_return = {instruction.inst_class == INST_CLASS::BR_RETURN, next_time};
+                    info.is_mispredict = {p2_misprediction, next_time};
+                    info.next_pc = {instruction.next_pc, next_time};
+                    p.update_cycle(info);
                     panel.next_cycle();
                     time = next_time;
                     npred++;

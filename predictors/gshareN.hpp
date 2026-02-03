@@ -93,8 +93,10 @@ struct gshareN : predictor {
         }
     }
 
-    void update_cycle([[maybe_unused]] val<1> mispredict, [[maybe_unused]] val<64> next_pc)
+    void update_cycle([[maybe_unused]] instruction_info &block_end_info)
     {
+        val<1> &mispredict = block_end_info.is_mispredict;
+        val<64> &next_pc = block_end_info.next_pc;
         if (num_branch == 0) {
             // no conditional branch in this block
             val<1> line_end = block_entry >> (LINEINST-block_size);

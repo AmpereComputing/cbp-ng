@@ -101,12 +101,13 @@ struct bimodal : predictor {
         num_branch++;
     }
 
-    void update_cycle([[maybe_unused]] val<1> mispredict, [[maybe_unused]] val<64> next_pc)
+    void update_cycle([[maybe_unused]] instruction_info &block_end_info)
     {
         // updates for all conditional branches in the predicted block
         if (num_branch == 0) {
             return;
         }
+        val<1> &mispredict = block_end_info.is_mispredict;
         mispredict.fanout(hard<LINEINST+1>{});
         branch_offset.fanout(hard<LINEINST>{});
         branch_dir.fanout(hard<2>{});

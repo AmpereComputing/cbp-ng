@@ -79,8 +79,9 @@ struct bimodalN : predictor {
         }
     }
 
-    void update_cycle([[maybe_unused]] val<1> mispredict, [[maybe_unused]] val<64> next_pc)
+    void update_cycle(instruction_info &block_end_info)
     {
+        val<1> &mispredict = block_end_info.is_mispredict;
         if (num_branch==0) {
             bb_inst = 0;
             return;
