@@ -159,7 +159,11 @@ Assuming your compiled binary is named `./cbp`, you can simulate one trace with
 ./cbp ./gcc_test_trace.gz test 1000000 40000000
 ```
 
-Or use the run script like:
+If you are planning to look at the simulator output directly, you can pass
+`--format human` when running to output the simulation results with more
+human-readable formatting.
+
+You may also use the run script like:
 
 ```console
 ./run ./cbp ./gcc_test_trace.gz
