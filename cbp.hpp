@@ -1,7 +1,7 @@
 #include <cstdint>
-
 #include <iostream>
 #include <functional>
+
 #include "trace_reader.hpp"
 #include "harcom.hpp"
 
@@ -115,6 +115,7 @@ class harcom_superuser {
     uint64_t max_p2_lat_ps = 0;
 
     trace_reader &reader;
+    bool human_readable_output = false;
 
     auto next_instruction()
     {
@@ -155,13 +156,17 @@ class harcom_superuser {
 
 public:
 
-    harcom_superuser(trace_reader &reader): reader(reader)
+    harcom_superuser(trace_reader &reader,
+                     bool human_readable_output=false)
+        : reader(reader), human_readable_output(human_readable_output)
     {
         panel.clock_cycle_ps = cycle_ps;
         panel.make_floorplan();
     }
 
-    void run(predictor &p, uint64_t warmup_instructions=0, uint64_t measurement_instructions=10)
+    void run(predictor &p,
+             uint64_t warmup_instructions=0,
+             uint64_t measurement_instructions=10)
     {
         warmed_up = (warmup_instructions==0);
 
@@ -280,18 +285,33 @@ public:
         double p2_latency_cycles = double(max_p2_lat_ps) / cycle_ps;
         double energy_fJ = panel.energy_fJ() - warmup_energy_fJ; // total correct-path dynamic energy
         double epi_fJ = energy_fJ / ninstr; // dynamic energy per correct-path instruction
-        std::cout << reader.name();
-        std::cout << "," << ninstr;
-        std::cout << "," << nbranch;
-        std::cout << "," << ncondbr;
-        std::cout << "," << npred;
-        std::cout << "," << extra_cycles;
-        std::cout << "," << p1_p2_disagreements;
-        std::cout << "," << p1_p2_disagreements_at_block_end;
-        std::cout << "," << mispredictions;
-        std::cout << "," << p1_latency_cycles;
-        std::cout << "," << p2_latency_cycles;
-        std::cout << "," << int64_t(epi_fJ);
-        std::cout << std::endl;
+        if (human_readable_output) {
+            std::cout << "trace                   : " << reader.name().c_str() << std::endl;
+            std::cout << "instructions            : " << ninstr << std::endl;
+            std::cout << "branches                : " << nbranch << std::endl;
+            std::cout << "conditional branches    : " << ncondbr << std::endl;
+            std::cout << "predictions             : " << npred << std::endl;
+            std::cout << "extra_cycles            : " << extra_cycles << std::endl;
+            std::cout << "short mispredictions    : " << p1_p2_disagreements << std::endl;
+            std::cout << "block-ending short misp : " << p1_p2_disagreements_at_block_end << std::endl;
+            std::cout << "mispredictions          : " << mispredictions << std::endl;
+            std::cout << "p1 latency              : " << std::setprecision(3) << p1_latency_cycles << " cycles" << std::endl;
+            std::cout << "p2 latency              : " << std::setprecision(3) << p2_latency_cycles << " cycles" << std::endl;
+            std::cout << "energy per instruction  : " << int64_t(epi_fJ) << " fJ" << std::endl;
+        } else {
+            std::cout << reader.name();
+            std::cout << "," << ninstr;
+            std::cout << "," << nbranch;
+            std::cout << "," << ncondbr;
+            std::cout << "," << npred;
+            std::cout << "," << extra_cycles;
+            std::cout << "," << p1_p2_disagreements;
+            std::cout << "," << p1_p2_disagreements_at_block_end;
+            std::cout << "," << mispredictions;
+            std::cout << "," << p1_latency_cycles;
+            std::cout << "," << p2_latency_cycles;
+            std::cout << "," << int64_t(epi_fJ);
+            std::cout << std::endl;
+        }
     }
 };
