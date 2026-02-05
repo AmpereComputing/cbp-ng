@@ -1,4 +1,5 @@
-#include <format>
+#include <sstream>
+#include <string>
 #include <map>
 
 #include "../../harcom.hpp"
@@ -32,8 +33,10 @@ struct energy_monitor {
     void record(const char *file, const int line) {
         std::string this_file = file;
         u64 this_line = line;
-        std::string key = std::format("{}:{} - {}:{}", last_file, last_line, this_file, this_line);
         f64 this_energy_fJ = panel.energy_fJ();
+        std::ostringstream oss;
+        oss << last_file << ":" << last_line << " - " << this_file << ":" << this_line;
+        std::string key = oss.str();
 
         f64 difference = this_energy_fJ - last_energy_fJ;
         if (counts.contains(key)) {
@@ -51,8 +54,8 @@ struct energy_monitor {
     }
 
     void report() {
-        printf("\nMeasurement points: average energy difference (fJ)\n");
-        printf("-------------------------------------\n");
+        printf("\nMeasurement start/end points: average energy difference (fJ)\n");
+        printf("-------------------------------------------------------------\n");
         for (const auto& [key, count] : counts) {
             printf("%s: %.2f fJ\n", key.c_str(), count.total_energy / count.count);
         }
