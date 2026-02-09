@@ -3790,6 +3790,10 @@ namespace hcm {
 
     T get() && // rvalue
     {
+      if (read_credit < 0) {
+        std::cerr<< "misuse of fo1()" << std::endl;
+        std::terminate();
+      }
       T old_data;
       if constexpr (std::signed_integral<T>) {
         old_data = sign_extended();
@@ -4988,7 +4992,6 @@ namespace hcm {
 
     [[nodiscard]] arr&& fo1() & // lvalue
     {
-      static_assert(! regtype<T>,"cannot apply fo1() to registers");
       return std::move(*this);
     }
 
