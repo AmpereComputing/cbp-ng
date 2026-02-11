@@ -5,6 +5,7 @@
   }) {} }:
 
 pkgs.mkShell {
+  hardeningDisable = [ "all" ];
   nativeBuildInputs = with pkgs.buildPackages; [
     clang
     clang-tools
