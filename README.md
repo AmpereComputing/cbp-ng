@@ -77,7 +77,7 @@ Sometimes an example is worth much more than an explanation. To that end,
 example predictors are available in [the `./predictors` subdirectory of the
 CBP-NG
 repository](https://github.com/AmpereComputing/cbp-ng/tree/main/predictors).
-These include bimodal, gshare, and TAGE reference predictors.
+These include bimodal, gshare, perceptron, and TAGE reference predictors.
 
 ### Common Utilities 
 
