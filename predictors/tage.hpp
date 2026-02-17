@@ -268,7 +268,9 @@ struct tage : predictor {
             // update global history if previous block ended on a mispredicted not-taken branch
             // (we are still in the same line, this is the last chunk)
             // or if the block ends before the line boundary (unconditional jump)
-            execute_if(~true_block | ~line_end.fo1(), [&](){
+            val<1> actual_block = ~(true_block & line_end.fo1());
+            actual_block.fanout(hard<GHIST+NUMG*2+2>{});
+            execute_if(actual_block, [&](){
                 next_pc.fanout(hard<2>{});
                 global_history1 = (global_history1 << 1) ^ val<GHIST1>{next_pc>>2};
                 gfolds.update(val<PATHBITS>{next_pc>>2});
@@ -508,6 +510,7 @@ struct tage : predictor {
         // update global history
         val<1> line_end = block_entry >> (LINEINST-block_size);
         true_block = correct_pred | branch_dir[num_branch-1] | line_end.fo1();
+        true_block.fanout(hard<GHIST+NUMG*2+2>{});
         execute_if(true_block, [&](){
             next_pc.fanout(hard<2>{});
             global_history1 = (global_history1 << 1) ^ val<GHIST1>{next_pc>>2};

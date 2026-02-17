@@ -21,13 +21,6 @@ using namespace hcm;
 // the bank associated with a given path depends on some bits XB of B0's address via XORing.
 // Each of the N predictions for B1 is associated with a lane.
 // To use lanes evenly, the lane depends on some bits XL of B1's address via XORing.
-//
-// Indirect jumps, in particular function returns, degrade prediction accuracy.
-// This problem can be mitigated by treating function calls as if they were conditional branches.
-// When a block B0 ends on a call, the block prediction associated with the call
-// being not-taken is saved in a stack. When it is time to get predictions for the block
-// after the function return, the prediction at the top of the stack is substituted for the
-// prediction obtained with ahead-indexing.
 
 
 template<u64 LOGG=19, u64 GHIST=8, u64 N=4>
