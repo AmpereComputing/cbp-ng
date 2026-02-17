@@ -4,7 +4,7 @@
 using namespace hcm;
 
 
-template<u64 LOGG=15, u64 GHIST=8, u64 LOGN=2>
+template<u64 LOGG=14, u64 GHIST=7, u64 LOGN=2>
 struct gshareN : predictor {
     // gshare with 2^LOGG entries, single prediction level (no overriding)
     // global history of GHIST bits
@@ -103,7 +103,8 @@ struct gshareN : predictor {
             // update global history if previous block ended on a mispredicted not-taken branch
             // (we are still in the same line, this is the last chunk)
             // or if the block ends before the line boundary (unconditional jump)
-            execute_if(~true_block | ~line_end.fo1(), [&](){
+            val<1> actual_block = ~(true_block & line_end.fo1());
+            execute_if(actual_block, [&](){
                 global_history = (global_history << 1) ^ val<GHIST>{next_pc.fo1()>>2};
                 true_block = 1;
             });
@@ -149,6 +150,7 @@ struct gshareN : predictor {
         // update the global history
         val<1> line_end = block_entry >> (LINEINST-block_size);
         true_block = (~mispredict & (num_branch<N)) | branch_dir[num_branch-1] | line_end.fo1();
+        true_block.fanout(hard<2>{});
         execute_if(true_block, [&](){
             global_history = (global_history << 1) ^ val<GHIST>{next_pc.fo1()>>2};
         });

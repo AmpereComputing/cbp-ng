@@ -3195,24 +3195,22 @@ namespace hcm {
       friend void execute_if(T&&,const A&);
     template<valtype T, action A> friend auto execute_if(T&&,const A&);
   private:
-    bool nested = false;
+    val<1,u64> *condval = nullptr;
     bool active = true;
-    u64 time = 0;
-    u64 location = 0;
-    exec_control(const exec_control &s) = default;
-    exec_control& operator=(const exec_control &s) = default;
+    u64 time = 0; // timing of the condition *before* executing the execute_if
 
-    void set_state(bool cond, u64 t=0, u64 l=0)
+    exec_control(const exec_control &) = default;
+    exec_control& operator=(const exec_control &) = default;
+
+    bool nested() const
     {
-      nested = true;
-      active = cond;
-      time = t;
-      location = l;
+      return condval != nullptr;
     }
 
-    auto to_val() const; // defined after class val
+    void set_state(val<1,u64> &cond); // circular dependency with class val, defined after it
+
   public:
-    exec_control() : active(true), time(0), location(0) {}
+    exec_control() {}
   } exec;
 
 
@@ -3295,7 +3293,7 @@ namespace hcm {
     }
 
   public:
-    // circular dependency with panel :(
+    // circular dependency with panel
     region();
     void enter();
   };
@@ -3464,7 +3462,7 @@ namespace hcm {
         return 0; // no connection
       } else {
         // make_floorplan() must have been called
-        connection &c =  connect[index(srcid,dstid)];
+        connection &c = connect[index(srcid,dstid)];
         region *rs = get_region(srcid);
         region *rd = get_region(dstid);
         region *r = (rs==rd)? rs : &default_region;
@@ -3701,7 +3699,6 @@ namespace hcm {
     static_assert(N!=0,"number of val bits cannot be null");
     static_assert(N<=bitwidth<T>,"number of val bits exceeds the underlying C++ type");
     static_assert(N==bitwidth<T> || std::integral<T>);
-
     template<u64,arith> friend class val;
     template<u64,arith> friend class reg;
     template<valtype, u64> friend class arr;
@@ -3832,7 +3829,7 @@ namespace hcm {
     {
       static_assert(std::integral<T>);
       auto [vx,tx] = x.get_vt();
-      if (exec.active) data = fit(vx);
+      data = fit(vx);
       set_time(tx);
       set_location(x.site());
     }
@@ -3841,12 +3838,10 @@ namespace hcm {
     {
       static_assert(std::integral<T>);
       auto [vx,tx] = std::move(x).get_vt();
-      if (exec.active) data = fit(vx);
+      data = fit(vx);
       set_time(tx);
       set_location(x.site());
     }
-
-    void operator&() = delete;
 
     template<u64 W>
     auto make_array(const std::tuple<T,u64> &vt)
@@ -4113,6 +4108,10 @@ namespace hcm {
 #ifndef FREE_FANOUT
       static_assert(FO>=2);
       if (is_less(FO,read_credit)) return;
+      if (read_credit < 0) {
+        std::cerr<< "misuse of fo1()" << std::endl;
+        std::terminate();
+      }
       // delay logarithmic with fanout
       panel.update_logic(site(),REP<N,FO>);
       set_time(time()+REP<N,FO>.delay());
@@ -4275,13 +4274,13 @@ namespace hcm {
     }
   };
 
-
   // ######################################################
 
-  inline auto exec_control::to_val() const
+  inline void exec_control::set_state(val<1,u64> &cond)
   {
-    assert(nested);
-    return val<1>(active,time,location);
+    condval = &cond;
+    active = cond.data;
+    time = cond.timing;
   }
 
   // ######################################################
@@ -4564,8 +4563,17 @@ namespace hcm {
       panel.update_xtors(stg::xtors,stg::fins);
     }
 
-    T get() & {return val<N,T>::get();}
-    T get() && = delete;
+    T get() & // lvalue
+    {
+      return val<N,T>::get();
+    }
+
+    T get() && // rvalue
+    {
+      return std::move(*this).val<N,T>::get();
+    }
+
+    void set_location(u64) = delete; // register location cannot be modified
 
   public:
 
@@ -4574,15 +4582,18 @@ namespace hcm {
       create();
     }
 
-    reg(reg &other) : val<N,T>{other}
+    reg(reg & other) : val<N,T>{other}
     {
       create();
     }
 
-    reg(reg &&) = delete;
+    reg(reg && other) : val<N,T>{std::move(other)}
+    {
+      create();
+    }
 
     template<std::convertible_to<val<N,T>> U>
-    reg(U &&x) : val<N,T>{std::forward<U>(x)}
+    reg(U && x) : val<N,T>{std::forward<U>(x)}
     {
       create();
     }
@@ -4594,34 +4605,42 @@ namespace hcm {
 
     void assign_from(T v, u64 t, u64 loc)
     {
+      // location of register is fixed
       if (panel.cycle <= last_write_cycle) {
         std::cerr << "single register write per cycle" << std::endl;
         std::terminate();
       }
-      if (! panel.arr_of_regs_ctor)
+      if (! panel.arr_of_regs_ctor) {
         last_write_cycle = panel.cycle;
-      t += panel.connect_delay(loc,val<N,T>::site(),val<N,T>::size);
-      if (t < exec.time) {
-        // exec.time is not null,  we are inside an execute_if
-        val<N,T>::set_time(exec.time);
-      } else {
-        val<N,T>::set_time(t);
       }
-      // location is fixed
-      if (exec.active) {
+      auto here = val<N,T>::site();
+      t += panel.connect_delay(loc,here,val<N,T>::size);
+      if (exec.nested()) {
+        // register written conditionally (execute_if)
+        val<N,T>::operator=(select(*exec.condval, val<N,T>{v,t,here}, *this));
+        if (exec.active) {
+          panel.update_energy(here,stg::write_energy_fJ);
+        }
+      } else {
+        // register written unconditionally
         val<N,T>::data = val<N,T>::fit(v);
-        panel.update_energy(val<N,T>::site(),stg::write_energy_fJ);
+        val<N,T>::set_time(t);
+        panel.update_energy(here,stg::write_energy_fJ);
       }
       val<N,T>::read_credit = 0;
     }
 
-    void operator= (reg &x)
+    void operator= (reg & x)
     {
       auto [vx,tx] = x.get_vt();
       assign_from(vx,tx,x.site());
     }
 
-    void operator= (reg &&) = delete;
+    void operator= (reg && x)
+    {
+      auto [vx,tx] = std::move(x).get_vt();
+      assign_from(vx,tx,x.site());
+    }
 
     template<typename U>
     void operator= (U && x)
@@ -4638,8 +4657,6 @@ namespace hcm {
         assign_from(x,0,val<N,T>::site());
       }
     }
-
-    void set_location(u64) = delete; // register location cannot be modified
   };
 
 
@@ -4678,8 +4695,6 @@ namespace hcm {
     {
       copy_from(x);
     }
-
-    void operator& () = delete;
 
     auto get() & // lvalue
     {
@@ -5381,6 +5396,12 @@ namespace hcm {
       } else if constexpr (arrtype<TYPED>) {
         td += panel.connect_delay(ld,ramid,dataval.nbits);
       }
+      // if conditional write (execute_if), the write happens no sooner than the condition
+      u64 twrite = std::max(ta,td);
+      if (exec.nested()) {
+        val<1> condval = exec.condval->connect(*this);
+        twrite = std::max(twrite,condval.time());
+      }
       if (exec.active) {
 #ifndef READ_WRITE_RAM
         if (panel.cycle <= last_access_cycle) {
@@ -5390,7 +5411,7 @@ namespace hcm {
 #endif
         last_access_cycle = panel.cycle;
         panel.update_energy(ramid,static_ram::EWRITE);
-        writes.push_back({u64(va),valuetype(vd),std::max(ta,td)});
+        writes.push_back({u64(va),valuetype(vd),twrite});
         std::push_heap(writes.begin(),writes.end());
       }
     }
@@ -5431,7 +5452,7 @@ namespace hcm {
         std::cerr << "out-of-bounds RAM read (N=" << N << "; addr=" << va << ")" << std::endl;
         std::terminate();
       }
-      T readval = (exec.active)? T{data[va]} : T{};
+      T readval = data[va];
       readval.set_time(t);
       readval.set_location(ramid);
       return readval;
@@ -6102,22 +6123,22 @@ namespace hcm {
   template<valtype T, action A> requires (std::same_as<return_type<A>,void>)
   void execute_if(T && mask, const A &f)
   {
-    // the delay/energy for gating the execution is not modeled (TODO?)
+    // FIXME: the gating signal is broadcast via magic wires (except for register writes)
     static_assert(std::unsigned_integral<base<T>>);
     constexpr u64 N = valt<T>::size;
     auto prev_exec = exec;
-    // nesting execute_ifs increases the predicate's delay
     val<N> cond_mask;
-    if (exec.nested) {
-      auto prev_cond = exec.to_val().replicate(hard<N>{}).concat();
+    if (exec.nested()) {
+      // nesting execute_ifs increases the predicate's delay
+      auto prev_cond = exec.condval->replicate(hard<N>{}).concat();
       cond_mask = prev_cond.fo1() & std::forward<T>(mask);
     } else {
       cond_mask = std::forward<T>(mask);
     }
-    auto [vm,tm,lm] = proxy::get_vtl(cond_mask.fo1());
+    arr<val<1>,N> condval = cond_mask.fo1().make_array(val<1>{});
     for (u64 i=0; i<N; i++) {
-      bool cond = (vm>>i) & 1;
-      exec.set_state(cond,tm,lm);
+      condval[i].read_credit = std::max(i64{0},mask.read_credit);
+      exec.set_state(condval[i]);
       // we execute the action even when the condition is false
       // (otherwise, this primitive could be used to leak any bit)
       if constexpr (std::invocable<A>) {
@@ -6133,39 +6154,35 @@ namespace hcm {
   template<valtype T, action A>
   [[nodiscard]] auto execute_if(T && mask, const A &f)
   {
-    // the delay/energy for gating the execution is not modeled (TODO?)
+    // return 0 if the condition is false
+    // FIXME: the gating signal is broadcast via magic wires (except for register writes and output values)
     static_assert(valtype<return_type<A>>);
     static_assert(std::unsigned_integral<base<T>>);
     constexpr u64 N = valt<T>::size;
     using rtype = valt<return_type<A>>;
-    // return 0 if the condition is false (AND gate)
-    constexpr circuit gate = AND<2> * rtype::size;
-    constexpr circuit buf = buffer(AND<2>.ci*rtype::size,false);
-    constexpr circuit out = buf + gate;
     auto prev_exec = exec;
-    // nesting execute_ifs increases the predicate's delay
     val<N> cond_mask;
-    if (exec.nested) {
-      auto prev_cond = exec.to_val().replicate(hard<N>{}).concat();
+    if (exec.nested()) {
+      // nesting execute_ifs increases the predicate's delay
+      auto prev_cond = exec.condval->replicate(hard<N>{}).concat();
       cond_mask = prev_cond.fo1() & std::forward<T>(mask);
     } else {
       cond_mask = std::forward<T>(mask);
     }
-    auto [vm,tm,lm] = proxy::get_vtl(cond_mask.fo1());
+    arr<val<1>,N> condval = cond_mask.fo1().make_array(val<1>{});
     arr<rtype,N> result;
     for (u64 i=0; i<N; i++) {
-      bool cond = (vm>>i) & 1;
-      exec.set_state(cond,tm,lm);
+      condval[i].read_credit = std::max(i64{0},mask.read_credit);
+      exec.set_state(condval[i]);
       // we execute the action even when the condition is false
       // (otherwise, this primitive could be used to leak any bit)
+      auto and_mask = condval[i].replicate(hard<rtype::size>{}).concat();
       if constexpr (std::invocable<A>) {
-        result[i] = f();
+        result[i] = f() & and_mask.fo1();
       } else {
         static_assert(std::invocable<A,u64>);
-        result[i] = f(i);
+        result[i] = f(i) & and_mask.fo1();
       }
-      result[i].set_time(std::max(result[i].time(),tm+buf.delay())+gate.delay());
-      proxy::update_logic(result[i].site(),out);
     };
     exec = prev_exec;
     return result;
