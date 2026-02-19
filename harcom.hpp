@@ -4096,10 +4096,22 @@ namespace hcm {
     val(val &x) : val{x.get(),x.time(),x.site()} {} // list initialization, get() executes before time()
 
     template<valtype U> requires std::unsigned_integral<T>
-    val(U && x) : val{to_unsigned(std::forward<U>(x).get()),x.time(),x.site()} {} // list initialization
+    val(U && x) : val{to_unsigned(std::forward<U>(x).get()),x.time(),x.site()} // list initialization
+    {
+      // sign extension allows replicating a bit at no hardware cost
+      static constexpr bool from_signed = std::signed_integral<typename valt<U>::type>;
+      static constexpr bool extension = (size > valt<U>::size);
+      static_assert(!(from_signed & extension),"sign extension is not allowed");
+    }
 
-    template<valtype U>
-    val(U && x) : val{std::forward<U>(x).get(),x.time(),x.site()} {} // list initialization
+    template<valtype U> requires std::signed_integral<T>
+    val(U && x) : val{std::forward<U>(x).get(),x.time(),x.site()} // list initialization
+    {
+      // sign extension allows replicating a bit at no hardware cost
+      static constexpr bool from_signed = std::signed_integral<typename valt<U>::type>;
+      static constexpr bool extension = (size > valt<U>::size);
+      static_assert(!(from_signed & extension),"sign extension is not allowed");
+    }
 
     template<std::integral auto FO>
     void fanout(hard<FO>) & // lvalue
