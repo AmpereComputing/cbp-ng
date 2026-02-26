@@ -6,6 +6,7 @@
 #include "predictors/bimodalN.hpp"
 #include "predictors/gshareN.hpp"
 #include "predictors/gshareN_ahead.hpp"
+#include "predictors/hashed_perceptron.hpp"
 #include "predictors/tutorial/tutorial.hpp"
 
 #ifdef PREDICTOR

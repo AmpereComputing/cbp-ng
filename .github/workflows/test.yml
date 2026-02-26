@@ -21,7 +21,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        predictor: ["bimodal<>", "bimodalN<>", "tage<>", "gshare<>", "gshareN<>", "never_taken"]
+        predictor: ["bimodal<>", "bimodalN<>", "tage<>", "gshare<>", "gshareN<>", "never_taken", "hashed_perceptron<>"]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout code
