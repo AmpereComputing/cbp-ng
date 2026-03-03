@@ -110,7 +110,7 @@ int main()
   }
   {
     EXEC(val<4> x=11);
-    EXEC(arr<val<8>,4> pp = execute_if(x,[&](u64 i){return val<8>{x}<<i;}));
+    EXEC(arr<val<8>,4> pp = [&](u64 i){return execute_if(val<1>{x>>i},[&](){return val<8>{x}<<i;});});
     EXEC(pp.fold_add().print("x*x=","\n\n",false));
   }
   {

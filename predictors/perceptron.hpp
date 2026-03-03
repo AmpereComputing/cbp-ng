@@ -147,7 +147,7 @@ struct perceptron : predictor {
     }
 
     void update_cycle([[maybe_unused]] instruction_info &block_end_info) {
-        block_end_info.is_taken.fanout(hard<HIST_LEN+1>{});
+        block_end_info.is_taken.fanout(hard<HIST_LEN>{});
         if (num_condbr == 0) {
             // Update the global history upon a taken branch
             execute_if(block_end_info.is_taken, [&](){
@@ -198,10 +198,11 @@ struct perceptron : predictor {
 
         // Which banks are performing an update?
         val<N> update_mask = mispredicted_mask.fo1() | (below_threshold.fo1().concat() & branches_mask.fo1());
-        update_mask.fanout(hard<3>{});
+        update_mask.fanout(hard<2>{});
+        arr<val<1>,N> update = update_mask.make_array(val<1>{});
 
         // Is *any* bank performing an update?
-        val<1> performing_update = update_mask.make_array(val<1>{}).fold_or();
+        val<1> performing_update = (update_mask != hard<0>{});
 
         // If we are doing an update, inform the simulator we need an extra
         // cycle to write the array (note this must be called *before* the
@@ -210,15 +211,18 @@ struct perceptron : predictor {
         need_extra_cycle(performing_update.fo1());
 
         global_history.fanout(hard<N+1>{});
-        execute_if(update_mask, [&](u64 i){
-            arr<val<WEIGHT_BITS, i64>, HIST_LEN+1> updated_vector = [&](u64 j) {
-                if (j == 0)
-                    return update_ctr(site[i].branch_weights[j], taken[i]);
-                else
-                    return update_ctr(site[i].branch_weights[j], taken[i] ^ global_history[j-1]);
-            };
-            site[i].weights.write(index, updated_vector.fo1());
-        });
+
+        for (u64 i=0; i<N; i++) {
+            execute_if(update[i].fo1(), [&](){
+                arr<val<WEIGHT_BITS, i64>, HIST_LEN+1> updated_vector = [&](u64 j) {
+                    if (j == 0)
+                        return update_ctr(site[i].branch_weights[j], taken[i]);
+                    else
+                        return update_ctr(site[i].branch_weights[j], taken[i] ^ global_history[j-1]);
+                };
+                site[i].weights.write(index, updated_vector.fo1());
+            });
+        }
 
         // Update the global history upon a taken branch
         execute_if(block_end_info.is_taken, [&]{

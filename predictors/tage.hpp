@@ -312,10 +312,9 @@ struct tage : predictor {
         arr<val<1>,LINEINST> is_branch = [&](u64 offset){
             return update_mask[offset] != hard<0>{};
         };
-        is_branch.fanout(hard<5>{});
+        is_branch.fanout(hard<6>{});
 
         val<LINEINST> branch_mask = is_branch.concat();
-        branch_mask.fanout(hard<2>{});
 
         val<LINEINST> actualdirs = branch_dir.concat();
         actualdirs.fanout(hard<LINEINST>{});
@@ -331,10 +330,9 @@ struct tage : predictor {
         actual_match1.fanout(hard<2>{});
 
         val<NUMG> primary_mask = actual_match1.fold_or();
-        primary_mask.fanout(hard<3>{});
-
+        primary_mask.fanout(hard<2>{});
         arr<val<1>,NUMG> primary = primary_mask.make_array(val<1>{});
-        primary.fanout(hard<2>{});
+        primary.fanout(hard<3>{});
 
         arr<val<1>,LINEINST> primary_wrong = [&](u64 offset){
             return pred1[offset] != branch_taken[offset];
@@ -357,10 +355,8 @@ struct tage : predictor {
         collamask1.fanout(hard<3>{});
         val<NUMG> collamask2 = (collamask^collamask1).one_hot();
         val<NUMG> collamask12 = select(val<2>{std::rand()}==hard<0>{}, collamask2.fo1(), collamask1);
-        val<NUMG> allocmask = collamask12.fo1().reverse();
-        allocmask.fanout(hard<5>{});
-        arr<val<1>,NUMG> allocate = allocmask.make_array(val<1>{});
-        allocate.fanout(hard<5>{});
+        arr<val<1>,NUMG> allocate = collamask12.fo1().reverse().make_array(val<1>{});
+        allocate.fanout(hard<7>{});
 
         // associate a branch direction to each global table
         arr<val<1>,NUMG> bdir = [&](u64 i) {
@@ -391,7 +387,7 @@ struct tage : predictor {
         };
 
         // do P1 and P2 agree?
-        val<LINEINST> disagree_mask = (p1 ^ p2) & branch_mask;
+        val<LINEINST> disagree_mask = (p1 ^ p2) & branch_mask.fo1();
         disagree_mask.fanout(hard<2>{});
         arr<val<1>,LINEINST> disagree = disagree_mask.make_array(val<1>{});
         disagree.fanout(hard<2>{});
@@ -446,35 +442,47 @@ struct tage : predictor {
 #endif
 
         // overwrite the tag in the allocated entry (mispredict)
-        execute_if(allocmask, [&](u64 i){gtag[i].write(gindex[i],concat(last_offset,htag[i]));});
+        for (u64 i=0; i<NUMG; i++) {
+            execute_if(allocate[i], [&](){gtag[i].write(gindex[i],concat(last_offset,htag[i]));});
+        }
 
         // update the u bits
-        val<NUMG> umask = primary_mask & altdiffer.fo1().concat(); // u bits update mask
+        arr<val<1>,NUMG> update_u = [&](u64 i){
+            return primary[i] & altdiffer[i].fo1();
+        };
         // if all post entries have the u bit set, reset their u bits
         val<1> noalloc = (candallocmask == hard<0>{});
         val<NUMG> uclearmask = postmask & noalloc.fo1().replicate(hard<NUMG>{}).concat();
-        uclearmask.fanout(hard<2>{});
-        arr<val<1>,NUMG> uclear = uclearmask.make_array(val<1>{});
-        execute_if(umask.fo1() | allocmask | uclearmask, [&](u64 i) {
-            val<1> newu = goodpred[i].fo1() & ~allocate[i] & ~uclear[i].fo1();
-            ubit[i].write(gindex[i],newu.fo1(),extra_cycle);
-        });
+        arr<val<1>,NUMG> uclear = uclearmask.fo1().make_array(val<1>{});
+        uclear.fanout(hard<2>{});
+        for (u64 i=0; i<NUMG; i++) {
+            execute_if(update_u[i].fo1() | allocate[i] | uclear[i], [&]() {
+                val<1> newu = goodpred[i].fo1() & ~allocate[i] & ~uclear[i];
+                ubit[i].write(gindex[i],newu.fo1(),extra_cycle);
+            });
+        }
 
         // update P1 prediction if P1 and P2 disagree and the hysteresis bit is weak
         auto p2_split = p2.make_array(val<1>{});
-        execute_if(p1_weak.fo1().concat(), [&](u64 offset){
-            // update with the P2 prediction, not with the actual branch direction
-            table1_pred[offset].write(index1,p2_split[offset].fo1());
-        });
+        for (u64 offset=0; offset<LINEINST; offset++) {
+            execute_if(p1_weak[offset].fo1(), [&](){
+                // update with the P2 prediction, not with the actual branch direction
+                table1_pred[offset].write(index1,p2_split[offset].fo1());
+            });
+        }
         // update P1 hysteresis
-        execute_if(branch_mask,[&](u64 offset){
-            table1_hyst[offset].write(index1,~disagree[offset]);
-        });
+        for (u64 offset=0; offset<LINEINST; offset++) {
+            execute_if(is_branch[offset],[&](){
+                table1_hyst[offset].write(index1,~disagree[offset]);
+            });
+        }
 
         // update incorrect bimodal prediction if primary provider and hysteresis is weak
-        execute_if(b_weak.fo1().concat(), [&](u64 offset){
-            bim[offset].write(bindex,branch_taken[offset]);
-        });
+        for (u64 offset=0; offset<LINEINST; offset++) {
+            execute_if(b_weak[offset].fo1(), [&](){
+                bim[offset].write(bindex,branch_taken[offset]);
+            });
+        }
         // update bimodal hysteresis if bimodal is primary provider
         for (u64 offset=0; offset<LINEINST; offset++) {
             val<1> bim_primary = match1[offset] >> NUMG;
@@ -485,16 +493,20 @@ struct tage : predictor {
 
         // update incorrect global prediction if primary provider and the hysteresis is weak;
         // initialize global prediction in the allocated entry
-        execute_if(g_weak.fo1().concat() | allocmask, [&](u64 i){
-            gpred[i].write(gindex[i],bdir[i]);
-        });
+        for (u64 i=0; i<NUMG; i++) {
+            execute_if(g_weak[i].fo1() | allocate[i], [&](){
+                gpred[i].write(gindex[i],bdir[i]);
+            });
+        }
         // update global prediction hysteresis if primary provider or allocated entry
-        execute_if(primary_mask | allocmask, [&](u64 i){
-            // if allocated entry, set hysteresis to 0;
-            // otherwise, increment hysteresis if correct pred, decrement if incorrect
-            val<2> newhyst = select(allocate[i],val<2>{0},update_ctr(readh[i],~badpred1[i]));
-            ghyst[i].write(gindex[i],newhyst.fo1(),extra_cycle);
-        });
+        for (u64 i=0; i<NUMG; i++) {
+            execute_if(primary[i] | allocate[i], [&](){
+                // if allocated entry, set hysteresis to 0;
+                // otherwise, increment hysteresis if correct pred, decrement if incorrect
+                val<2> newhyst = select(allocate[i],val<2>{0},update_ctr(readh[i],~badpred1[i]));
+                ghyst[i].write(gindex[i],newhyst.fo1(),extra_cycle);
+            });
+        }
 
 #ifdef RESET_UBITS
         uctr.fanout(hard<3>{});

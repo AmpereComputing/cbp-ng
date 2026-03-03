@@ -23,7 +23,7 @@ using namespace hcm;
 // To use lanes evenly, the lane depends on some bits XL of B1's address via XORing.
 
 
-template<u64 LOGG=19, u64 GHIST=8, u64 N=4>
+template<u64 LOGG=19, u64 GHIST=10, u64 N=4>
 struct gshareN_ahead : predictor {
     // gshare with 2^LOGG entries, single prediction level (no overriding)
     // global history of GHIST bits
@@ -161,18 +161,20 @@ struct gshareN_ahead : predictor {
         val<LANES> misp_lane = execute_if(mispredict, [&]() -> val<LANES> {
             return lane[num_branch-1];
         });
-        misp_lane.fanout(hard<2>{});
-        arr<val<1>,LANES> mispredicted = misp_lane.make_array(val<1>{});
+        arr<val<1>,LANES> mispredicted = misp_lane.fo1().make_array(val<1>{});
+        mispredicted.fanout(hard<2>{});
 
         // determine the bank to update
         val<LOGBANKS> bank = path ^ XB[1];
         bank.fanout(hard<2*LANES+BANKS>{});
 
         // read hysteresis bit if lane corresponds to mispredicted branch
-        arr<val<1>,LANES> weak = execute_if(misp_lane, [&](u64 i){
-            // return 1 iff mispredict and hysteresis is weak
-            return ctr_lo[i].read(concat(index[1],bank));
-        });
+        arr<val<1>,LANES> weak = [&](u64 i){
+            return execute_if(mispredicted[i], [&](){
+                // return 1 iff mispredict and hysteresis is weak
+                return ctr_lo[i].read(concat(index[1],bank));
+            });
+        };
 
         // we need an extra cycle if there is a mispredict
         need_extra_cycle(mispredict);
@@ -191,9 +193,11 @@ struct gshareN_ahead : predictor {
         });
 
         // update hysteresis
-        execute_if(access.fo1().concat(), [&](u64 i){
-            ctr_lo[i].write(concat(index[1],bank),mispredicted[i].fo1());
-        });
+        for (u64 i=0; i<LANES; i++) {
+            execute_if(access[i].fo1(), [&](){
+                ctr_lo[i].write(concat(index[1],bank),mispredicted[i].fo1());
+            });
+        }
 
         // update the global history
         val<1> line_end = block_entry >> (LINEINST-block_size);

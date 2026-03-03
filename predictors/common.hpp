@@ -68,12 +68,16 @@ struct rwram {
         val<B> current_write = banksel & noconflict_mask;
         current_write.fanout(hard<3>{});
         arr<val<1>,B> current_write_split = current_write.make_array(val<1>{});
-        current_write_split.fanout(hard<2>{});
-        execute_if(current_write | (write_bank & ~read_bank), [&](u64 i){
-            val<L> a = select(current_write_split[i],localaddr,write_localaddr);
-            val<N> d = select(current_write_split[i],data,write_data);
-            bank[i].write(a.fo1(),d.fo1());
-        });
+        current_write_split.fanout(hard<3>{});
+        arr<val<1>,B> write_bank_split = write_bank.make_array(val<1>{});
+        arr<val<1>,B> read_bank_split = read_bank.make_array(val<1>{});
+        for (u64 i=0; i<B; i++) {
+            execute_if(current_write_split[i] | (write_bank_split[i].fo1() & ~read_bank_split[i].fo1()), [&](){
+                val<L> a = select(current_write_split[i],localaddr,write_localaddr);
+                val<N> d = select(current_write_split[i],data,write_data);
+                bank[i].write(a.fo1(),d.fo1());
+            });
+        }
         // buffer the current write if not done
         // keep the previous write if not done and the current write is done
         // otherwise invalidate buffered write

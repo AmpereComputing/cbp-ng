@@ -122,8 +122,8 @@ struct bimodal : predictor {
         arr<val<1>,LINEINST> is_branch = [&](u64 offset){
             return update_mask[offset] != hard<0>{};
         };
-        val<LINEINST> branch_mask = is_branch.fo1().concat();
-        branch_mask.fanout(hard<3>{});
+        is_branch.fanout(hard<3>{});
+        val<LINEINST> branch_mask = is_branch.concat();
         val<LINEINST> actualdirs = branch_dir.concat();
         actualdirs.fanout(hard<LINEINST>{});
         arr<val<1>,LINEINST> branch_taken = [&](u64 offset){
@@ -137,7 +137,7 @@ struct bimodal : predictor {
         mispredicted.fanout(hard<2>{});
 
         // do P1 and P2 agree?
-        val<LINEINST> disagree_mask = (p1 ^ p2) & branch_mask;
+        val<LINEINST> disagree_mask = (p1 ^ p2) & branch_mask.fo1();
         disagree_mask.fanout(hard<2>{});
         arr<val<1>,LINEINST> disagree = disagree_mask.make_array(val<1>{});
         disagree.fanout(hard<2>{});
@@ -162,23 +162,31 @@ struct bimodal : predictor {
         need_extra_cycle(mispredict | (disagree_mask != hard<0>{}));
 
         // update P1 prediction if P1 and P2 disagree and the hysteresis bit is weak
-        execute_if(p1_weak.fo1().concat(), [&](u64 i){
-            // update with the P2 prediction, not with the actual branch direction
-            table1_hi[i].write(index1,ctr2_hi[i]);
-        });
+        // update with the P2 prediction, not with the actual branch direction
+        for (u64 i=0; i<LINEINST; i++) {
+            execute_if(p1_weak[i].fo1(), [&](){
+                table1_hi[i].write(index1,ctr2_hi[i]);
+            });
+        }
         // update P1 hysteresis
-        execute_if(branch_mask,[&](u64 i){
-            table1_lo[i].write(index1,~disagree[i]);
-        });
+        for (u64 i=0; i<LINEINST; i++) {
+            execute_if(is_branch[i], [&](){
+                table1_lo[i].write(index1,~disagree[i]);
+            });
+        }
 
         // update P2 prediction if misprediction and the hysteresis bit is weak
-        execute_if(p2_weak.fo1().concat(), [&](u64 i){
-            table2_hi[i].write(index2,branch_taken[i].fo1());
-        });
+        for (u64 i=0; i<LINEINST; i++) {
+            execute_if(p2_weak[i].fo1(), [&](){
+                table2_hi[i].write(index2,branch_taken[i].fo1());
+            });
+        }
         // update P2 hysteresis
-        execute_if(branch_mask,[&](u64 i){
-            table2_lo[i].write(index2,~mispredicted[i]);
-        });
+        for (u64 i=0; i<LINEINST; i++) {
+            execute_if(is_branch[i], [&](){
+                table2_lo[i].write(index2,~mispredicted[i]);
+            });
+        }
 
         num_branch = 0; // done
     }

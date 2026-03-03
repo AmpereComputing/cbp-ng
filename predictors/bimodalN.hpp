@@ -103,13 +103,15 @@ struct bimodalN : predictor {
         val<N> misp_bank = execute_if(mispredict, [&]() -> val<N> {
             return bank[num_branch-1];
         });
-        misp_bank.fanout(hard<2>{});
-        arr<val<1>,N> mispredicted = misp_bank.make_array(val<1>{});
+        arr<val<1>,N> mispredicted = misp_bank.fo1().make_array(val<1>{});
+        mispredicted.fanout(hard<2>{});
         // read hysteresis bit if bank corresponds to mispredicted branch
-        arr<val<1>,N> weak = execute_if(misp_bank, [&](u64 i){
-            // return 1 iff mispredict and hysteresis is weak
-            return ctr_lo[i].read(index);
-        });
+        arr<val<1>,N> weak = [&](u64 i){
+            return execute_if(mispredicted[i], [&](){
+                // return 1 iff mispredict and hysteresis is weak
+                return ctr_lo[i].read(index);
+            });
+        };
         // we need an extra cycle if there is a mispredict
         need_extra_cycle(mispredict);
         // update prediction if mispredict and the hysteresis bit is weak
@@ -120,9 +122,11 @@ struct bimodalN : predictor {
             ctr_hi.write(index,bundle.fo1());
         });
         // update hysteresis
-        execute_if(access.fo1().concat(), [&](u64 i){
-            ctr_lo[i].write(index,mispredicted[i].fo1());
-        });
+        for (u64 i=0; i<N; i++) {
+            execute_if(access[i].fo1(), [&](){
+                ctr_lo[i].write(index,mispredicted[i]);
+            });
+        }
         num_branch = 0;
         bb_inst = 0;
     }
