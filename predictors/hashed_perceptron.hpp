@@ -223,9 +223,9 @@ struct hashed_perceptron : predictor {
         arr<val<1>, LINEINST> is_branch = [&](u64 offset){
             return update_mask[offset] != hard<0>{};
         };
-        is_branch.fanout(hard<2>{});
+        is_branch.fanout(hard<3>{});
         val<LINEINST> branch_mask = is_branch.concat();
-        branch_mask.fanout(hard<6>{});
+        branch_mask.fanout(hard<5>{});
 
         // is the outcome of the branch at the offset taken?
         val<LINEINST> actualdirs = branch_dir.concat();
@@ -256,7 +256,8 @@ struct hashed_perceptron : predictor {
 
         // perceptrons are updated if the prediction is wrong or weak
         val<LINEINST> train_mask = branch_mask & (~correct_mask | weak_mask);
-        train_mask.fanout(hard<NTABLES+2>{});
+        train_mask.fanout(hard<2>{});
+        arr<val<1>,LINEINST> train = train_mask.make_array(val<1>{});
 
         // ---- P1 (gshare) update ----
         // did P1 and P2 disagree?
@@ -276,21 +277,27 @@ struct hashed_perceptron : predictor {
         need_extra_cycle(extra_cycle.fo1());
 
         // update P1 prediction if P1 and P2 disagree and hysteresis bit is weak
-        execute_if(p1_weak.fo1().concat(), [&](u64 offset){
-            table1_pred[offset].write(index1, p2_split[offset]);
-        });
+        for (u64 offset=0; offset<LINEINST; offset++) {
+            execute_if(p1_weak[offset].fo1(), [&](){
+                table1_pred[offset].write(index1, p2_split[offset]);
+            });
+        }
         // update P1 hysteresis for executed branches
-        execute_if(branch_mask, [&](u64 offset){
-            table1_hyst[offset].write(index1, ~disagree[offset]);
-        });
+        for (u64 offset=0; offset<LINEINST; offset++) {
+            execute_if(is_branch[offset], [&](){
+                table1_hyst[offset].write(index1, ~disagree[offset]);
+            });
+        }
 
         // ---- P2 (hashed perceptron) update ----
         // weight update
-        execute_if(train_mask, [&](u64 offset){
-            for (u64 i=0; i<NTABLES; i++) {
-                wtable[i][offset].write(index2[i], update_ctr(readw[offset][i], ~branch_taken[offset]));
-            }
-        });
+        for (u64 offset=0; offset<LINEINST; offset++) {
+            execute_if(train[offset].fo1(), [&](){
+                for (u64 i=0; i<NTABLES; i++) {
+                    wtable[i][offset].write(index2[i], update_ctr(readw[offset][i], ~branch_taken[offset]));
+                }
+            });
+        }
 
         // update packed counter
         // decrement on weak & correct
