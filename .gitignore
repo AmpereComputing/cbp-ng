@@ -3,6 +3,7 @@
 
 # Local simulator/reference binaries
 /cbp
+/cbp_profile
 /reference
 /test_harcom
 /a.out
