@@ -1,6 +1,6 @@
 # Predictor compile-time config used by `make cbp`.
 # Default: predictor + template_args list.
-predictor: tage
+predictor: gshare 
 template_args: []
 
 # Build/profile options (YAML-first compile tuning)

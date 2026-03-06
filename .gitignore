@@ -13,3 +13,6 @@
 
 # Run outputs
 *.out
+
+/out/*
+/traces/*
