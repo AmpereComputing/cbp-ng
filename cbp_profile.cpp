@@ -30,6 +30,7 @@ static RunMode g_mode = RunMode::ANALYZE;
 static bool g_profile = false;        // enable per-function profiling in analyze mode
 static bool g_print_score = true;     // print score breakdown (captures CSV line)
 static bool g_host_timing = false;    // host wall-clock timing per function (optional)
+static bool g_show_regions = false;   // show per-region hardware metrics
 
 // ========================== Fixed-buffer val.print() ==========================
 namespace fastio {
@@ -752,11 +753,123 @@ struct profiled_predictor final : public P {
   }
 };
 
+// ========================== Hardware Geometry ==========================
+#ifdef ENABLE_REGION_PROFILING
+static void print_hardware_geometry(std::ostream& os) {
+  using namespace hcm;
+
+  os << "\n=== Hardware Geometry (Compile-time Constants) ===\n";
+  os << std::setprecision(3) << std::fixed;
+
+  // Total metrics
+  u64 total_xtors = panel.transistors();
+  u64 total_fins = panel.xtor_fins();
+  f64 sram_area = panel.area_sram_mm2();
+  u64 total_storage = panel.storage();
+  u64 sram_storage = panel.storage_sram();
+  f64 static_power = panel.sta_power_mW();
+  u64 clock_cycle_ps = (u64)panel.clock_cycle_ps;
+
+  os << "Total Transistors: " << total_xtors << "\n";
+  os << "Total Fins: " << total_fins << "\n";
+  if (total_xtors != 0) {
+    os << "Fins/Transistor: " << (double)total_fins / total_xtors << "\n";
+  }
+  os << "SRAM Area: " << sram_area << " mm²\n";
+  os << "Total Storage: " << total_storage << " bits (" << sram_storage << " SRAM)\n";
+  os << "Static Power: " << static_power << " mW\n";
+  os << "Clock Cycle: " << clock_cycle_ps << " ps (" << (1000.0 / clock_cycle_ps) << " GHz)\n";
+
+  if (cbpp::g_show_regions) {
+    const auto& regions = panel.get_regions();
+
+    // Collect region metrics for sorting
+    struct RegionInfo {
+      size_t index;
+      u64 transistors;
+      u64 fins;
+      f64 sram_area_mm2;
+      u64 storage_bits;
+      u64 sram_bits;
+      std::string name;
+    };
+
+    std::vector<RegionInfo> region_infos;
+    for (size_t i = 0; i < regions.size(); i++) {
+      region_infos.push_back({
+        i,
+        panel.transistors(*regions[i]),
+        panel.xtor_fins(*regions[i]),
+        panel.area_sram_mm2(*regions[i]),
+        panel.storage(*regions[i]),
+        panel.storage_sram(*regions[i]),
+        regions[i]->name  // HARCOM modification: region now has public name field
+      });
+    }
+
+    // Sort by transistor count (descending)
+    std::sort(region_infos.begin(), region_infos.end(),
+      [](const RegionInfo& a, const RegionInfo& b) {
+        return a.transistors > b.transistors;
+      });
+
+    os << "\n=== Hardware Breakdown by Region (largest first) ===\n";
+    os << std::left << std::setw(20) << "Region"
+       << std::right << std::setw(15) << "Transistors"
+       << std::setw(15) << "Fins"
+       << std::setw(15) << "SRAM Area(mm²)"
+       << std::setw(18) << "Storage(bits)\n";
+    os << std::string(83, '-') << "\n";
+
+    for (const auto& info : region_infos) {
+      std::string region_label = info.name.empty() ?
+        ("Region" + std::to_string(info.index)) : info.name;
+      os << std::left << std::setw(20) << region_label
+         << std::right << std::setw(15) << info.transistors
+         << std::setw(15) << info.fins
+         << std::setw(15) << info.sram_area_mm2
+         << std::setw(18) << info.storage_bits << "\n";
+    }
+    os << "=== end ===\n";
+  }
+}
+#else
+static void print_hardware_geometry(std::ostream& os) {
+  using namespace hcm;
+
+  os << "\n=== Hardware Geometry (Compile-time Constants) ===\n";
+  os << std::setprecision(3) << std::fixed;
+
+  // Total metrics (no region access without ENABLE_REGION_PROFILING)
+  u64 total_xtors = panel.transistors();
+  u64 total_fins = panel.xtor_fins();
+  f64 sram_area = panel.area_sram_mm2();
+  u64 total_storage = panel.storage();
+  u64 sram_storage = panel.storage_sram();
+  f64 static_power = panel.sta_power_mW();
+  u64 clock_cycle_ps = (u64)panel.clock_cycle_ps;
+
+  os << "Total Transistors: " << total_xtors << "\n";
+  os << "Total Fins: " << total_fins << "\n";
+  if (total_xtors != 0) {
+    os << "Fins/Transistor: " << (double)total_fins / total_xtors << "\n";
+  }
+  os << "SRAM Area: " << sram_area << " mm²\n";
+  os << "Total Storage: " << total_storage << " bits (" << sram_storage << " SRAM)\n";
+  os << "Static Power: " << static_power << " mW\n";
+  os << "Clock Cycle: " << clock_cycle_ps << " ps (" << (1000.0 / clock_cycle_ps) << " GHz)\n";
+
+  if (cbpp::g_show_regions) {
+    os << "(Region breakdown requires -DENABLE_REGION_PROFILING)\n";
+  }
+}
+#endif
+
 // ========================== Driver ==========================
 static void usage(const char* name) {
   std::cerr
     << "Usage:\n  " << name
-    << " --format csv|human --mode acc|analyze [--profile] [--host-timing] [--no-score]\n"
+    << " --format csv|human --mode acc|analyze [--profile] [--regions] [--host-timing] [--no-score]\n"
     << "   <trace.gz> <trace_name> <warmup_instr> <meas_instr>\n";
   std::exit(1);
 }
@@ -787,6 +900,8 @@ int main(int argc, char* argv[]) {
       else usage(argv[0]);
     } else if (arg == "--profile") {
       g_profile = true;
+    } else if (arg == "--regions") {
+      g_show_regions = true;
     } else if (arg == "--host-timing") {
       g_host_timing = true;
     } else if (arg == "--no-score") {
@@ -846,6 +961,8 @@ int main(int argc, char* argv[]) {
     harcom_superuser sim(reader, human);
     sim.run(*pred, warmup_instr, meas_instr);
   }
+
+  print_hardware_geometry(std::cerr);
 
   if (g_mode == RunMode::ACCURACY) {
     acc::print_accuracy(std::cerr);

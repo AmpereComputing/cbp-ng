@@ -22,7 +22,7 @@ TRACE_NAME ?= test
 WARMUP ?= 1000000
 MEASURE ?= 40000000
 
-.PHONY: all help cbp reference predictor-config run-cbp run-reference cbp-profile cbp-profile-acc cbp-profile-analyze cbp-profile-analyze-host clean
+.PHONY: all help cbp reference predictor-config run-cbp run-reference cbp-profile cbp-profile-acc cbp-profile-acc-regions cbp-profile-analyze cbp-profile-analyze-regions clean
 
 all: cbp reference
 
@@ -32,11 +32,12 @@ help:
 	@echo "  make reference              Build CBP2025 reference predictor"
 	@echo "  make run-cbp                Run cbp on TRACE with direct args"
 	@echo "  make run-reference          Run reference on TRACE with direct args"
-	@echo "  make cbp-profile            Build profiling harness"
-	@echo "  make cbp-profile-acc        Run profiler in accuracy mode (fast iteration)"
-	@echo "  make cbp-profile-analyze    Run profiler in analyze mode (per-function breakdown)"
-	@echo "  make cbp-profile-analyze-host Run analyze with wall-clock timing"
-	@echo "  make predictor-config       Generate $(PREDICTOR_MK) from $(PARAMS_FILE)"
+	@echo "  make cbp-profile                Build profiling harness"
+	@echo "  make cbp-profile-acc            Run profiler in accuracy mode (fast iteration)"
+	@echo "  make cbp-profile-acc-regions    Accuracy mode with per-region breakdown"
+	@echo "  make cbp-profile-analyze        Run profiler in analyze mode (per-function breakdown)"
+	@echo "  make cbp-profile-analyze-regions Analyze mode with per-region breakdown"
+	@echo "  make predictor-config           Generate $(PREDICTOR_MK) from $(PARAMS_FILE)"
 	@echo "  make clean                  Remove generated build artifacts"
 	@echo
 	@echo "Variables you can override:"
@@ -65,25 +66,29 @@ run-cbp: cbp
 run-reference: reference
 	./reference $(TRACE) $(TRACE_NAME) $(WARMUP) $(MEASURE)
 
-cbp-profile: cbp_profile.cpp cbp.hpp branch_predictor.hpp trace_reader.hpp harcom.hpp $(wildcard predictors/*.hpp) $(PREDICTOR_MK)
-	$(CXX) $(COMMON_FLAGS) $(EXTRA_COMMON_FLAGS) $(PROFILE_WARN_FLAGS) -o $@ cbp_profile.cpp -lz -DPREDICTOR='$(PREDICTOR_TYPE)'
-
 out:
 	mkdir -p $@
 
-cbp-profile-acc: cbp-profile | out
-	./cbp-profile --format csv --mode acc --no-score $(TRACE) $(TRACE_NAME) $(WARMUP) $(MEASURE) 1> out/profile.csv 2> out/profile_acc.txt
+out/cbp-profile: cbp_profile.cpp cbp.hpp branch_predictor.hpp trace_reader.hpp harcom.hpp $(wildcard predictors/*.hpp) $(PREDICTOR_MK) | out
+	$(CXX) $(COMMON_FLAGS) $(EXTRA_COMMON_FLAGS) $(PROFILE_WARN_FLAGS) -o $@ cbp_profile.cpp -lz -DPREDICTOR='$(PREDICTOR_TYPE)' -DENABLE_REGION_PROFILING
+
+cbp-profile-acc: out/cbp-profile
+	./out/cbp-profile --format csv --mode acc --no-score $(TRACE) $(TRACE_NAME) $(WARMUP) $(MEASURE) 1> out/profile.csv 2> out/profile_acc.txt
 	@echo "=== Accuracy Analysis ===" && tail -20 out/profile_acc.txt
 
-cbp-profile-analyze: cbp-profile | out
-	./cbp-profile --format csv --mode analyze --profile $(TRACE) $(TRACE_NAME) $(WARMUP) $(MEASURE) 1> out/profile.csv 2> out/profile_analyze.txt
+cbp-profile-acc-regions: out/cbp-profile
+	./out/cbp-profile --format csv --mode acc --no-score --regions $(TRACE) $(TRACE_NAME) $(WARMUP) $(MEASURE) 1> out/profile.csv 2> out/profile_acc.txt
+	@echo "=== Accuracy Analysis with Regions ===" && tail -40 out/profile_acc.txt
+
+cbp-profile-analyze: out/cbp-profile
+	./out/cbp-profile --format csv --mode analyze --profile $(TRACE) $(TRACE_NAME) $(WARMUP) $(MEASURE) 1> out/profile.csv 2> out/profile_analyze.txt
 	@echo "=== Per-Function Analysis ===" && tail -30 out/profile_analyze.txt
 
-cbp-profile-analyze-host: cbp-profile | out
-	./cbp-profile --format csv --mode analyze --profile --host-timing $(TRACE) $(TRACE_NAME) $(WARMUP) $(MEASURE) 1> out/profile.csv 2> out/profile_analyze_host.txt
-	@echo "=== Per-Function Analysis (with Host Timing) ===" && tail -30 out/profile_analyze_host.txt
+cbp-profile-analyze-regions: out/cbp-profile
+	./out/cbp-profile --format csv --mode analyze --profile --regions $(TRACE) $(TRACE_NAME) $(WARMUP) $(MEASURE) 1> out/profile.csv 2> out/profile_analyze.txt
+	@echo "=== Per-Function Analysis with Regions ===" && tail -40 out/profile_analyze.txt
 
 clean:
-	rm -f cbp reference cbp-profile
+	rm -f cbp reference
 	rm -rf out/
 	rm -f $(PREDICTOR_MK)
