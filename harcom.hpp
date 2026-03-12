@@ -119,7 +119,7 @@ namespace hcm {
   concept unaryfunc = (std::same_as<X,void> && requires (T f) {{f()} -> std::convertible_to<Y>;}) || requires (T f, X i) {{f(i)} -> std::convertible_to<Y>;};
 
   template<typename T>
-  concept action = requires (T f) {f();} || requires (T f, u64 i) {f(i);};
+  concept action = requires (T f) {f();};
 
   template<u64 N, arith T> class val;
   template<u64 N, arith T> class reg;
@@ -3195,19 +3195,32 @@ namespace hcm {
       friend void execute_if(T&&,const A&);
     template<valtype T, action A> friend auto execute_if(T&&,const A&);
   private:
-    val<1,u64> *condval = nullptr;
+    std::vector<val<1,u64>*> condptr;
     bool active = true;
-    u64 time = 0; // timing of the condition *before* executing the execute_if
+    u64 time = 0; // timing of the predicate *before* executing the execute_if
 
     exec_control(const exec_control &) = default;
-    exec_control& operator=(const exec_control &) = default;
+    exec_control& operator=(const exec_control &) = delete;
 
     bool nested() const
     {
-      return condval != nullptr;
+      return ! condptr.empty();
     }
 
-    void set_state(val<1,u64> &cond); // circular dependency with class val, defined after it
+    std::tuple<bool,u64> save_state() const
+    {
+      return {active,time};
+    }
+
+    void restore_state(std::tuple<bool,u64> state)
+    {
+      std::tie(active,time) = state;
+      condptr.pop_back();
+    }
+
+    // circular dependency with class val
+    void set_state(val<1,u64> &cond);
+    val<1,u64> gating_signal(u64 nesting=0) const;
 
   public:
     exec_control() {}
@@ -4297,9 +4310,9 @@ namespace hcm {
 
   inline void exec_control::set_state(val<1,u64> &cond)
   {
-    condval = &cond;
-    active = cond.data;
-    time = cond.timing;
+    active &= cond.data;
+    time = std::max(time,cond.timing);
+    condptr.push_back(&cond);
   }
 
   // ######################################################
@@ -4633,15 +4646,16 @@ namespace hcm {
         last_write_cycle = panel.cycle;
       }
       auto here = val<N,T>::site();
-      t += panel.connect_delay(loc,here,val<N,T>::size);
+      t += panel.connect_delay(loc,here,N);
       if (exec.nested()) {
         // register written conditionally (execute_if)
         if (exec.active) {
           val<N,T>::data = val<N,T>::fit(v);
           panel.update_energy(here,stg::write_energy_fJ);
         }
-        val<1> condval = exec.condval->connect(*this);
-        val<N,T>::set_time(std::max({this->timing,t,condval.timing}));
+        val<1> gating = exec.gating_signal().connect(*this);
+        if constexpr (N>1) gating.fanout(hard<N>{});
+        val<N,T>::set_time(std::max({this->timing,t,gating.timing}));
       } else {
         // register written unconditionally
         val<N,T>::data = val<N,T>::fit(v);
@@ -4667,6 +4681,10 @@ namespace hcm {
     void operator= (U && x)
     {
       if constexpr (valtype<U>) {
+        // sign extension allows replicating a bit at no hardware cost
+        static constexpr bool from_signed = std::signed_integral<typename valt<U>::type>;
+        static constexpr bool extension = (N > valt<U>::size);
+        static_assert(!(from_signed & extension),"sign extension is not allowed");
         if constexpr (std::is_rvalue_reference_v<decltype(x)>) {
           auto [vx,tx] = std::move(x).get_vt();
           assign_from(vx,tx,x.site());
@@ -4971,16 +4989,6 @@ namespace hcm {
     void operator= (U && x)
     {
       copy_from(std::forward<U>(x));
-    }
-
-    operator T() & requires (N==1) // lvalue
-    {
-      return elem[0];
-    }
-
-    operator T() && requires (N==1) // rvalue
-    {
-      return elem[0].fo1();
     }
 
     T& operator[] (u64 i)
@@ -5420,8 +5428,10 @@ namespace hcm {
       // if conditional write (execute_if), the write happens no sooner than the condition
       u64 twrite = std::max(ta,td);
       if (exec.nested()) {
-        val<1> condval = exec.condval->connect(*this);
-        twrite = std::max(twrite,condval.time());
+        val<1> gating = exec.gating_signal().connect(*this);
+        if constexpr (rawdata<T>::width > 1)
+          gating.fanout(hard<rawdata<T>::width>{});
+        twrite = std::max(twrite,gating.time());
       }
       if (exec.active) {
 #ifndef READ_WRITE_RAM
@@ -5882,7 +5892,7 @@ namespace hcm {
   {
     auto [v2,t2,l2] = proxy::get_vtl(std::forward<T2>(x2));
     using rtype = val<std::min(val<64>::size,valt<T2>::size+1),decltype(x1-v2)>;
-    if (x1==0) return proxy::make_val<rtype>(-v2,t2,l2);
+    //if (x1==0) return proxy::make_val<rtype>(-v2,t2,l2); // could be abused (sign extension for free)
     static constexpr circuit c = INC<valt<T2>::size>; // TODO: specialize more
     proxy::update_logic(l2,c);
     return proxy::make_val<rtype>(x1-v2, t2+c.delay(), l2);
@@ -6140,72 +6150,68 @@ namespace hcm {
     }
   }
 
+  inline val<1> exec_control::gating_signal(u64 nesting) const
+  {
+    assert(condptr.size()!=0);
+    if (condptr.size()==1) return *condptr[0];
+    if (condptr.size()==2) return *condptr[0] & *condptr[1];
+    if (nesting == (condptr.size()-1)) return *condptr[nesting];
+    return *condptr[nesting] & gating_signal(nesting+1);
+  }
+
   // CONDITIONAL EXECUTION
   template<valtype T, action A> requires (std::same_as<return_type<A>,void>)
-  void execute_if(T && mask, const A &f)
+  void execute_if(T && cond, const A &f)
   {
-    // FIXME: the gating signal is broadcast via magic wires (except for register writes)
-    static_assert(std::unsigned_integral<base<T>>);
-    static constexpr u64 N = valt<T>::size;
-    auto prev_exec = exec;
-    val<N> cond_mask;
-    if (exec.nested()) {
-      // nesting execute_ifs increases the predicate's delay
-      auto prev_cond = exec.condval->replicate(hard<N>{}).concat();
-      cond_mask = prev_cond.fo1() & std::forward<T>(mask);
+    // The action is executed even when the condition is false (otherwise, could be used to leak any bit)
+    static_assert(valt<T>::size==1,"the condition of execute_if is a single bit");
+    static_assert(std::invocable<A>);
+    auto old_state = exec.save_state();
+    if constexpr (std::is_rvalue_reference_v<decltype(cond)>) {
+      val<1> condval = std::move(cond);
+      condval.fanout(hard<2>{}); // for compatibility with CHECK_FANOUT
+      exec.set_state(condval);
+      f();
     } else {
-      cond_mask = std::forward<T>(mask);
+      static_assert(std::same_as<base<T>,u64>,"execute_if condition must be a val<1>");
+      exec.set_state(cond);
+      f();
     }
-    arr<val<1>,N> condval = cond_mask.fo1().make_array(val<1>{});
-    for (u64 i=0; i<N; i++) {
-      condval[i].read_credit = std::max(i64{0},mask.read_credit);
-      exec.set_state(condval[i]);
-      // we execute the action even when the condition is false
-      // (otherwise, this primitive could be used to leak any bit)
-      if constexpr (std::invocable<A>) {
-        f();
-      } else {
-        static_assert(std::invocable<A,u64>);
-        f(i);
-      }
-    }
-    exec = prev_exec;
+    exec.restore_state(old_state);
   }
 
   template<valtype T, action A>
-  [[nodiscard]] auto execute_if(T && mask, const A &f)
+  [[nodiscard]] auto execute_if(T && cond, const A &f)
   {
-    // return 0 if the condition is false
-    // FIXME: the gating signal is broadcast via magic wires (except for register writes and output values)
+    // Return 0 if the condition is false.
+    // The action is executed even when the condition is false (otherwise, could be used to leak any bit)
+    static_assert(valt<T>::size==1,"the condition of execute_if is a single bit");
+    static_assert(std::invocable<A>);
     static_assert(valtype<return_type<A>>);
-    static_assert(std::unsigned_integral<base<T>>);
-    static constexpr u64 N = valt<T>::size;
     using rtype = valt<return_type<A>>;
-    auto prev_exec = exec;
-    val<N> cond_mask;
-    if (exec.nested()) {
-      // nesting execute_ifs increases the predicate's delay
-      auto prev_cond = exec.condval->replicate(hard<N>{}).concat();
-      cond_mask = prev_cond.fo1() & std::forward<T>(mask);
+    auto old_state = exec.save_state();
+    rtype result;
+    if constexpr (std::is_rvalue_reference_v<decltype(cond)>) {
+      val<1> condval = std::move(cond);
+      condval.fanout(hard<2>{}); // for compatibility with CHECK_FANOUT
+      exec.set_state(condval);
+      val<1> gating = exec.gating_signal();
+      if constexpr (rtype::size>1)
+        gating.fanout(hard<rtype::size>{});
+      auto [v,t,l] = proxy::get_vtl(gating.fo1());
+      val<rtype::size> mask {-v,t,l};
+      result = f() & mask.fo1();
     } else {
-      cond_mask = std::forward<T>(mask);
+      static_assert(std::same_as<base<T>,u64>,"execute_if condition must be a val<1>");
+      exec.set_state(cond);
+      val<1> gating = exec.gating_signal();
+      if constexpr (rtype::size>1)
+        gating.fanout(hard<rtype::size>{});
+      auto [v,t,l] = proxy::get_vtl(gating.fo1());
+      val<rtype::size> mask {-v,t,l};
+      result = f() & mask.fo1();
     }
-    arr<val<1>,N> condval = cond_mask.fo1().make_array(val<1>{});
-    arr<rtype,N> result;
-    for (u64 i=0; i<N; i++) {
-      condval[i].read_credit = std::max(i64{0},mask.read_credit);
-      exec.set_state(condval[i]);
-      // we execute the action even when the condition is false
-      // (otherwise, this primitive could be used to leak any bit)
-      auto and_mask = condval[i].replicate(hard<rtype::size>{}).concat();
-      if constexpr (std::invocable<A>) {
-        result[i] = f() & and_mask.fo1();
-      } else {
-        static_assert(std::invocable<A,u64>);
-        result[i] = f(i) & and_mask.fo1();
-      }
-    };
-    exec = prev_exec;
+    exec.restore_state(old_state);
     return result;
   }
 

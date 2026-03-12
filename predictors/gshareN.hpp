@@ -133,21 +133,23 @@ struct gshareN : predictor {
         X.fanout(hard<N+1>{});
 
         // access = mask telling which banks are accessed by branches in the block
-        val<N> access = arr<val<N>,N> { [&](u64 i)->val<N> {
+        arr<val<1>,N> access = arr<val<N>,N> { [&](u64 i)->val<N> {
                 return X.rotate_left(i) & val<N>{-(i<num_branch)};
-        }}.fold_or();
+        }}.fold_or().make_array(val<1>{});
 
         // misp bank = bit vector pointing to the bank accessed by the mispredicted branch
         // (all zero if no mispredict)
         val<N> misp_bank = X.rotate_left(num_branch-1) & mispredict.replicate(hard<N>{}).concat();
-        misp_bank.fanout(hard<2>{});
-        arr<val<1>,N> mispredicted = misp_bank.make_array(val<1>{});
+        arr<val<1>,N> mispredicted = misp_bank.fo1().make_array(val<1>{});
+        mispredicted.fanout(hard<2>{});
 
         // read hysteresis bit iff mispredict
         // weak[i] = 1 iff bank #i corresponds to mispredicted branch and hysteresis is weak
-        arr<val<1>,N> weak = execute_if(misp_bank, [&](u64 i){
-            return ctr_lo[i].read(index);
-        });
+        arr<val<1>,N> weak = [&](u64 i){
+            return execute_if(mispredicted[i], [&](){
+                return ctr_lo[i].read(index);
+            });
+        };
 
         // we need an extra cycle if there is a mispredict
         need_extra_cycle(mispredict);
@@ -162,9 +164,11 @@ struct gshareN : predictor {
         });
 
         // update hysteresis
-        execute_if(access.fo1(), [&](u64 i){
-            ctr_lo[i].write(index,mispredicted[i].fo1());
-        });
+        for (u64 i=0; i<N; i++) {
+            execute_if(access[i].fo1(), [&](){
+                ctr_lo[i].write(index,mispredicted[i].fo1());
+            });
+        }
 
         // update the global history if this is a true block
         true_block = arr<val<1>,4> {
