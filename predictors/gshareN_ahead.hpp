@@ -23,7 +23,7 @@ using namespace hcm;
 // To use lanes evenly, the lane depends on some bits XL of B1's address via XORing.
 
 
-template<u64 LOGG=19, u64 GHIST=10, u64 N=4>
+template<u64 LOGG=19, u64 GHIST=12, u64 N=4>
 struct gshareN_ahead : predictor {
     // gshare with 2^LOGG entries, single prediction level (no overriding)
     // global history of GHIST bits
@@ -44,63 +44,97 @@ struct gshareN_ahead : predictor {
 
     // pipelined over 2 cycles ([0]=current block, [1]=previous block)
     reg<index_bits> index[2];
-    reg<LOGBANKS> XB[2]; // address bits for selecting the bank
-    reg<LOGLANES> XL; // address bits for selecting the lane (current block)
-    reg<LOGBANKS> path; // path out of previous block
+    reg<LOGBANKS> XB[2]; // for using banks evenly
+    reg<LANES> XL; // for using lanes evenly
+    reg<LOGBANKS> path[2]; // path out of previous block
 
     arr<reg<LANES>,BANKS> block_pred[2]; // read block predictions
-    arr<reg<1>,LANES> unordered_pred; // read prediction bits for the current block, unordered
+    reg<LANES> unordered_pred; // read prediction bits for the current block, unordered
     arr<reg<1>,LANES> pred; // read prediction bits for the current block, ordered
 
-    ram<arr<val<LANES>,BANKS>,(1<<index_bits)> ctr_hi; // prediction bits
+    // a true block is a block whose length is the same whether or not there is a mispredict
+    reg<1> true_block = 1;
+    reg<1> condbr_taken = 1;
+
+    // for detecting the line boundary and the last available prediction
+    reg<LINEINST> block_entry; // one-hot vector pointing to entry point in the line
+    reg<N> rank; // one-hot bit vector telling the rank of the current branch in the block
 
     // simulation artifacts, hardware cost not modeled accurately
-    reg<1> true_block = 1;
-    reg<LINEINST> block_entry; // one-hot vector
     u64 num_branch = 0; // number of conditional branches in block so far
     u64 block_size = 0; // instructions in current block so far
     arr<reg<1>,N> branch_dir; // actual branch direction
 
-    zone UPDATE_ONLY;
+    // RAMs
+    ram<arr<val<LANES>,BANKS>,(1<<index_bits)> ctr_hi; // prediction bits
     ram<val<1>,(BANKS<<index_bits)> ctr_lo[LANES]; // hysteresis bit (1=weak, 0=strong)
+
+    val<1> line_end()
+    {
+        return block_entry >> (LINEINST-block_size);
+    }
+
+    val<1> last_pred()
+    {
+        return rank.rotate_left(num_branch);
+    }
 
     val<1> predict1([[maybe_unused]] val<64> inst_pc)
     {
-        // new block
-        assert(num_branch==0);
-        block_size = 1;
-        index[1] = index[0];
-        val<index_bits> pc_bits = inst_pc >> (LOGBANKS+2);
-        if constexpr (GHIST <= index_bits) {
-            index[0] = pc_bits.fo1() ^ (val<index_bits>{global_history}<<(index_bits-GHIST));
-        } else {
-            index[0] = global_history.make_array(val<index_bits>{}).append(pc_bits.fo1()).fold_xor();
-        }
-        index[0].fanout(hard<2>{});
-        XL = inst_pc >> 2;
+        inst_pc.fanout(hard<3>{});
+        global_history.fanout(hard<2>{});
+        true_block.fanout(hard<6>{});
+
+        // if the previous block was not a true block, we continue using the previous block predictions
+        // (golden rule: never make a predictor's inputs depend on its outputs)
+
+        block_entry = select(true_block,
+                             val<LOGLINEINST>{inst_pc>>2}.decode().concat(),
+                             block_entry<<block_size);
+        block_entry.fanout(hard<LINEINST+N+1>{});
+
+        rank = select(true_block, val<N>{1}, rank.rotate_left(num_branch));
+
+        XL = select(true_block,
+                    val<LOGLANES>{inst_pc>>2}.decode().concat(),
+                    XL.rotate_left(num_branch));
         XL.fanout(hard<LANES>{});
-        XB[1] = XB[0].fo1();
-        XB[0] = inst_pc >> 2;
-        XB[1].fanout(hard<2>{});
-        block_pred[1] = block_pred[0].fo1();
-        block_pred[0] = ctr_hi.read(index[0]);
-        block_pred[1].fanout(hard<2>{});
-        unordered_pred = block_pred[1].select(path^XB[1]).make_array(val<1>{});
-        unordered_pred.fanout(hard<LANES>{});
+
+        execute_if(true_block, [&](){
+            index[1] = index[0];
+            val<index_bits> pc_bits = inst_pc >> (LOGBANKS+2);
+            if constexpr (GHIST <= index_bits) {
+                index[0] = pc_bits.fo1() ^ (val<index_bits>{global_history}<<(index_bits-GHIST));
+            } else {
+                index[0] = global_history.make_array(val<index_bits>{}).append(pc_bits.fo1()).fold_xor();
+            }
+            block_pred[1] = block_pred[0].fo1();
+            block_pred[0] = ctr_hi.read(index[0]);
+            XB[1] = XB[0].fo1();
+            XB[0] = inst_pc >> 2;
+            path[1] = (path[0] + num_branch) & condbr_taken.replicate(hard<LOGBANKS>{}).concat();
+            path[1].fanout(hard<3>{});
+            unordered_pred = block_pred[1].select(path[1]^XB[1]);
+            unordered_pred.fanout(hard<LANES>{});
+        });
+
+        path[0] = select(true_block, val<LOGBANKS>{0}, val<LOGBANKS>{path[0]+num_branch});
+        path[0].fanout(hard<2>{});
+
         for (u64 i=0; i<LANES; i++) {
-            pred[i] = unordered_pred.select(i^XL);
+            pred[i] = (unordered_pred & XL.rotate_left(i)) != hard<0>{};
         }
         pred.fanout(hard<LINEINST*2>{});
-        block_entry = val<LOGLINEINST>{inst_pc>>2}.decode().concat();
-        block_entry.fanout(hard<LINEINST>{});
-        reuse_prediction(~val<1>{block_entry>>(LINEINST-1)});
-        return pred[0];
+        block_size = 1;
+        num_branch = 0;
+        reuse_prediction(~line_end());
+        return pred[num_branch];
     };
 
     val<1> reuse_predict1([[maybe_unused]] val<64> inst_pc)
     {
-        reuse_prediction(~val<1>{block_entry>>(LINEINST-1-block_size)});
         block_size++;
+        reuse_prediction(~line_end());
         return pred[num_branch];
     };
 
@@ -119,10 +153,7 @@ struct gshareN_ahead : predictor {
         assert(num_branch<N);
         branch_dir[num_branch] = taken.fo1();
         num_branch++;
-        if (num_branch == N) {
-            // this was the last branch for which we have a prediction: end the block
-            reuse_prediction(0);
-        }
+        reuse_prediction(~(line_end() | last_pred()));
     }
 
     void update_cycle([[maybe_unused]] instruction_info &block_end_info)
@@ -131,15 +162,9 @@ struct gshareN_ahead : predictor {
         val<64> &next_pc = block_end_info.next_pc;
         if (num_branch == 0) {
             // no conditional branch in this block
-            // update global history if previous block ended on a mispredicted not-taken branch
-            // (we are still in the same line, this is the last chunk)
-            // or if the block ends on an unconditional jump
-            val<1> uncond_jump = block_end_info.is_taken & ~block_end_info.is_conditional;
-            execute_if(~true_block | uncond_jump.fo1(), [&](){
-                global_history = (global_history << 1) ^ val<GHIST>{next_pc.fo1()>>2};
-                true_block = 1;
-            });
-            path = 0;
+            global_history = (global_history << 1) ^ val<GHIST>{next_pc.fo1()>>2};
+            condbr_taken = 0;
+            true_block = 1;
             return; // stop here
         }
         static_assert(LANES<=64);
@@ -148,41 +173,38 @@ struct gshareN_ahead : predictor {
         branch_dir[num_branch-1].fanout(hard<LANES+LOGBANKS+1>{});
         mispredict.fanout(hard<4>{});
 
-        // determine the lanes that are accessed
-        arr<val<LANES>,LANES> lane = [&](u64 i) -> val<LANES> {
-            return (XL^i).decode().concat();
-        };
-        lane.fanout(hard<2>{});
-        arr<val<1>,LANES> access = [&](u64 i) -> val<1> {
-            return (lane[i]>>num_branch) == hard<0>{};
-        };
+        // access = mask telling which lanes are accessed by branches in the block
+        arr<val<1>,LANES> access = arr<val<LANES>,LANES> { [&](u64 i){
+                return XL.rotate_left(i) & val<LANES>{-(i<num_branch)};
+        }}.fold_or().make_array(val<1>{});
 
-        // determine the lane corresponding to the mispredicted branch
-        val<LANES> misp_lane = execute_if(mispredict, [&]() -> val<LANES> {
-            return lane[num_branch-1];
-        });
-        arr<val<1>,LANES> mispredicted = misp_lane.fo1().make_array(val<1>{});
+        // misp bank = bit vector pointing to the lane accessed by the mispredicted branch
+        // (all zero if no mispredict)
+        val<LANES> misp_bank = XL.rotate_left(num_branch-1) & mispredict.replicate(hard<LANES>{}).concat();
+        arr<val<1>,LANES> mispredicted = misp_bank.fo1().make_array(val<1>{});
         mispredicted.fanout(hard<2>{});
 
         // determine the bank to update
-        val<LOGBANKS> bank = path ^ XB[1];
+        val<LOGBANKS> bank = path[1] ^ XB[1];
         bank.fanout(hard<2*LANES+BANKS>{});
 
-        // read hysteresis bit if lane corresponds to mispredicted branch
+        // read hysteresis bit iff mispredict
+        // weak[i] = 1 iff bank #i corresponds to mispredicted branch and hysteresis is weak
         arr<val<1>,LANES> weak = [&](u64 i){
             return execute_if(mispredicted[i], [&](){
-                // return 1 iff mispredict and hysteresis is weak
                 return ctr_lo[i].read(concat(index[1],bank));
             });
         };
 
         // we need an extra cycle if there is a mispredict
         need_extra_cycle(mispredict);
+
         // update prediction if mispredict and the hysteresis bit is weak
         execute_if(mispredict, [&](){
+            arr<val<1>,N> stored_pred = unordered_pred.make_array(val<1>{});
             val<LANES> block_bundle = arr<val<1>,LANES>{
                 [&](u64 i){
-                    return select(weak[i].fo1(),branch_dir[num_branch-1],unordered_pred[i]);
+                    return select(weak[i].fo1(),branch_dir[num_branch-1],stored_pred[i].fo1());
                 }
             }.concat();
             block_bundle.fanout(hard<BANKS>{});
@@ -199,17 +221,16 @@ struct gshareN_ahead : predictor {
             });
         }
 
-        // update the global history
-        val<1> line_end = block_entry >> (LINEINST-block_size);
-        true_block = (~mispredict & (num_branch<N)) | branch_dir[num_branch-1] | line_end.fo1();
+        condbr_taken = branch_dir[num_branch-1];
+
+        // update the global history if this is a true block
+        true_block = arr<val<1>,4> {
+            ~mispredict, condbr_taken, last_pred(), line_end()
+        }.fold_or();
+
         execute_if(true_block, [&](){
             global_history = (global_history << 1) ^ val<GHIST>{next_pc.fo1()>>2};
         });
 
-        // record the path: if last cond branch not-taken, then path=0, else path=num_branch
-        path = num_branch & branch_dir[num_branch-1].replicate(hard<LOGBANKS>{}).concat();
-        path.fanout(hard<2>{});
-
-        num_branch = 0;
     }
 };
