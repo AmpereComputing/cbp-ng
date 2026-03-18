@@ -201,7 +201,7 @@ struct gshareN_ahead : predictor {
 
         // update prediction if mispredict and the hysteresis bit is weak
         execute_if(mispredict, [&](){
-            arr<val<1>,N> stored_pred = unordered_pred.make_array(val<1>{});
+            arr<val<1>,LANES> stored_pred = unordered_pred.make_array(val<1>{});
             val<LANES> block_bundle = arr<val<1>,LANES>{
                 [&](u64 i){
                     return select(weak[i].fo1(),branch_dir[num_branch-1],stored_pred[i].fo1());

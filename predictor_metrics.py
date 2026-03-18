@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-misprediction_penalty = 8
+p2_to_exec_stages = 9
 
 import sys
 import os
@@ -84,7 +84,7 @@ for filename in os.listdir(directory):
         IPC = instructions / cycles
 
         # cycles lost per correct-path instruction because of mispredictions
-        CPI = MPI * (misprediction_penalty + p2_latency)
+        CPI = MPI * (p2_to_exec_stages + p2_latency - max(1,min(p1_latency,p2_latency)))
 
         #print(f"{name},{IPC:.6f},{CPI:.6f},{EPI}")
 
