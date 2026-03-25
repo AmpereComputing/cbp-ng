@@ -23,7 +23,7 @@ using namespace hcm;
 // To use lanes evenly, the lane depends on B1's address.
 
 
-template<u64 LOGG=19, u64 GHIST=16, u64 N=4>
+template<u64 LOGG=19, u64 GHIST=16, u64 N=7>
 struct gshareN_ahead : predictor {
     // gshare with 2^LOGG entries, single prediction level (no overriding)
     // global history of GHIST bits
@@ -94,7 +94,7 @@ struct gshareN_ahead : predictor {
     val<1> predict1([[maybe_unused]] val<64> inst_pc)
     {
         inst_pc.fanout(hard<4>{});
-        true_block.fanout(hard<5>{});
+        true_block.fanout(hard<8+BANKS*2>{});
 
         // if the previous block was not a true block, we continue using the previous block predictions
         // (golden rule: never make a predictor's inputs depend on its outputs)
@@ -108,7 +108,7 @@ struct gshareN_ahead : predictor {
         rank.fanout(hard<N+2>{});
 
         XL = select(true_block,
-                    val<LOGLANES>{inst_pc>>2}.decode().concat(),
+                    val<LOGLANES>{inst_pc>>6}.decode().concat(),
                     XL.rotate_left(num_branch));
         XL.fanout(hard<LANES>{});
 
@@ -128,7 +128,7 @@ struct gshareN_ahead : predictor {
         });
 
         XB = select(true_block,
-                    val<LOGBANKS>{inst_pc>>2},
+                    val<LOGBANKS>{inst_pc>>6},
                     val<LOGBANKS>{XB.fo1()+num_branch});
 
         for (u64 i=0; i<LANES; i++) {
