@@ -35,9 +35,8 @@ struct gshareN_ahead : predictor {
     static_assert(LOGG>(LOGLANES+LOGBANKS));
     static constexpr u64 index_bits = LOGG-(LOGLANES+LOGBANKS);
     // a block does not continue past a line boundary
-    static constexpr u64 LINEINST = 64; // line size in instructions
-    static_assert(std::has_single_bit(LINEINST)); // power of 2
-    static constexpr u64 LOGLINEINST = std::bit_width(LINEINST-1);
+    static constexpr u64 LOGLINEINST = 10;
+    static constexpr u64 LINEINST = 1 << LOGLINEINST; // line size in instructions
 
     reg<GHIST> global_history;
 
@@ -57,7 +56,7 @@ struct gshareN_ahead : predictor {
     reg<1> last_condbr_dir = 1;
 
     // for detecting the line boundary and the last available prediction
-    reg<LINEINST> block_entry; // one-hot vector pointing to entry point in the line
+    reg<LOGLINEINST> block_entry; // offset of the entry point in the line
     reg<N+1> rank; // one-hot bit vector telling the rank of the current branch in the block
 
     // simulation artifacts, hardware cost not modeled accurately
@@ -71,7 +70,7 @@ struct gshareN_ahead : predictor {
 
     val<1> line_end()
     {
-        return block_entry >> (LINEINST-block_size);
+        return (block_entry + block_size) == hard<LINEINST>{};
     }
 
     val<1> last_pred()
@@ -100,8 +99,8 @@ struct gshareN_ahead : predictor {
         // (golden rule: never make a predictor's inputs depend on its outputs)
 
         block_entry = select(true_block,
-                             val<LOGLINEINST>{inst_pc>>2}.decode().concat(),
-                             block_entry<<block_size);
+                             val<LOGLINEINST>{inst_pc>>2},
+                             val<LOGLINEINST>{block_entry+block_size});
         block_entry.fanout(hard<LINEINST+N+1>{});
 
         rank = select(true_block, val<N+1>{1}, rank<<num_branch);
