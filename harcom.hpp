@@ -3744,7 +3744,7 @@ namespace hcm {
       if constexpr (N < bitwidth<T>) {
         assert((std::make_unsigned_t<T>(data) >> N) == 0);
       }
-      static constexpr T signbit = T(1) << (N-1);
+      static constexpr T signbit = static_cast<T>(T(1) << (N-1));
       return (data ^ signbit) - signbit;
     }
 
