@@ -3,6 +3,7 @@
 
 using namespace hcm;
 
+template <class = void>
 struct always_taken : predictor {
     val<1> predict1([[maybe_unused]] val<64> inst_pc)
     {
