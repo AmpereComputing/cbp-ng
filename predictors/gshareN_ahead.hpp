@@ -66,7 +66,7 @@ struct gshareN_ahead : predictor {
 
     // RAMs
     ram<arr<val<LANES>,BANKS>,(1<<index_bits)> ctr_hi; // prediction bits
-    ram<val<1>,(BANKS<<index_bits)> ctr_lo[LANES]; // hysteresis bit (1=weak, 0=strong)
+    ram<val<1>,(BANKS<<index_bits)> ctr_lo[LANES]; // hysteresis bit (0=weak, 1=strong)
 
     val<1> line_end()
     {
@@ -203,7 +203,7 @@ struct gshareN_ahead : predictor {
         // weak[i] = 1 iff bank #i corresponds to mispredicted branch and hysteresis is weak
         arr<val<1>,LANES> weak = [&](u64 i){
             return execute_if(mispredicted[i], [&](){
-                return ctr_lo[i].read(concat(index[1],path));
+                return ~ctr_lo[i].read(concat(index[1],path));
             });
         };
 
@@ -228,7 +228,7 @@ struct gshareN_ahead : predictor {
         // update hysteresis
         for (u64 i=0; i<LANES; i++) {
             execute_if(access[i].fo1(), [&](){
-                ctr_lo[i].write(concat(index[1],path),mispredicted[i].fo1());
+                ctr_lo[i].write(concat(index[1],path),~mispredicted[i].fo1());
             });
         }
 
