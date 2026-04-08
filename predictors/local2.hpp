@@ -4,34 +4,21 @@
 
 using namespace hcm;
 
-// Two-level local branch predictor.
-// PHT (Pattern History Table): indexed by branch PC, stores per-branch local
-//      history shift registers (HIST_LEN bits each).
-// BHT (Branch History Table): indexed by local history from PHT, stores
-//      2-bit saturating counters (00=SN, 01=WN, 10=WT, 11=ST).
-// P1 reads the PHT and returns the history MSB as a fast bimodal-style guess.
-// P2 uses that history to index the BHT and returns the accurate prediction.
+
+// Two-level local branch predictor
+// PHT: indexed by branch PC, stores per-branch local history (HIST_LEN bits)
+// BHT: indexed by local history, stores 2-bit saturating counters
+// P1 reads PHT and returns history MSB; P2 reads BHT[history] for the accurate prediction.
 //
-// Template parameters:
-//   LOG_PHT  - log2(# PHT entries). Fewer entries → more PHT aliasing (branches
-//              share history registers).
-//   HIST_LEN - History bits per PHT entry. More bits → finer patterns, but the
-//              BHT needs 2^HIST_LEN entries to avoid BHT aliasing.
-//   LOG_BHT  - log2(# BHT entries). Equal to HIST_LEN = no BHT aliasing.
-//              Less than HIST_LEN → BHT aliasing (different histories share a counter).
-//              More than HIST_LEN → wasted BHT capacity (unreachable entries).
-//   LOGLB    - log2(cache-line size in bytes). Default 6 = 64-byte lines.
-//
-// Custom configs (use quotes in shell to protect the angle brackets):
-//   ./compile cbp -DPREDICTOR="local2_tpl<6,8,8,8>"    fewer PHT entries
-//   ./compile cbp -DPREDICTOR="local2_tpl<6,10,8,4>"   heavy BHT aliasing
-//   ./compile cbp -DPREDICTOR="local2_tpl<6,10,4,4>"   short history
-//   ./compile cbp -DPREDICTOR="local2_tpl<6,12,12,12>" large tables, long history
+// LOG_PHT  : log2(# PHT entries). Fewer → more PHT aliasing across branches.
+// HIST_LEN : history bits per branch. More → finer patterns; BHT needs 2^HIST_LEN entries for no aliasing.
+// LOG_BHT  : log2(# BHT entries). Equal to HIST_LEN = no BHT aliasing; less → BHT aliasing.
+// LOGLB    : log2(cache-line bytes). Default 6 = 64-byte lines.
 template<u64 LOGLB=6, u64 LOG_PHT=10, u64 HIST_LEN=8, u64 LOG_BHT=HIST_LEN>
 struct local2_tpl : predictor {
-    static_assert(HIST_LEN >= 1 && HIST_LEN <= 32, "HIST_LEN out of range");
-    static_assert(LOG_PHT  >= 1 && LOG_PHT  <= 20, "LOG_PHT out of range");
-    static_assert(LOG_BHT  >= 1 && LOG_BHT  <= 20, "LOG_BHT out of range");
+    static_assert(HIST_LEN >= 1 && HIST_LEN <= 32);
+    static_assert(LOG_PHT  >= 1 && LOG_PHT  <= 20);
+    static_assert(LOG_BHT  >= 1 && LOG_BHT  <= 20);
 
     ram<val<HIST_LEN>, (1<<LOG_PHT)> pht;
     ram<val<2>, (1<<LOG_BHT)> bht;
@@ -106,7 +93,5 @@ struct local2_tpl : predictor {
     }
 };
 
-// Default instantiation. Using a concrete struct (not a template) means
-// -DPREDICTOR=local2 works without angle brackets, avoiding shell quoting
-// issues with < and > being treated as redirect operators.
+// Default instantiation — usable as -DPREDICTOR=local2 (no angle brackets needed)
 struct local2 : local2_tpl<> {};
