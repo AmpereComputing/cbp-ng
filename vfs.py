@@ -39,4 +39,4 @@ normalizedEPI = ((EPIcbp/EPIcbp0) * cbp_energy_ratio + LAMBDA * speedup**GAMMA) 
 # print("normalized EPI = {}".format(normalizedEPI))
 
 VFS = speedup * ALPHA * (1-2/(1+math.sqrt(1+BETA/(speedup*normalizedEPI))))
-print("{:.6f}".format(VFS))
+print("{:.4f}".format(VFS))
